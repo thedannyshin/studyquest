@@ -174,6 +174,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
   --post-w: var(--content-w);
   height: 100vh;
   height: 100dvh;
+  height: var(--app-height, 100dvh);
   display: flex;
   overflow: hidden;
   background: #fff;
@@ -1407,12 +1408,29 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
 }
 
 @media (max-width: 720px) {
+  html {
+    height: 100%;
+  }
+  body {
+    /* 1px of document scroll room — Safari only collapses chrome on window scroll */
+    min-height: calc(var(--app-height, 100svh) + 1px);
+  }
+  #root {
+    min-height: var(--app-height, 100svh);
+  }
   .app-shell {
     flex-direction: column;
+    position: fixed;
+    top: var(--app-top, 0px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: var(--app-height, 100svh);
+    max-height: var(--app-height, 100svh);
     --tabbar-h: calc(50px + env(safe-area-inset-bottom));
-    --frame-h: calc(100dvh - var(--tabbar-h));
+    --frame-h: var(--app-height, 100svh);
     --content-w: 100%;
-    --post-h: var(--frame-h);
+    --post-h: 100%;
     --post-w: 100%;
   }
   .app-sidebar {
@@ -1426,11 +1444,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
     grid-template-columns: repeat(4, 1fr);
     align-items: stretch;
     gap: 0;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: relative;
+    flex-shrink: 0;
     z-index: 40;
+    width: 100%;
     min-height: calc(50px + env(safe-area-inset-bottom));
     padding: 6px 0 calc(4px + env(safe-area-inset-bottom));
     border-top: 0.5px solid rgba(0,0,0,.12);
@@ -1463,8 +1480,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
   .feed-layout {
     flex: 1;
     min-height: 0;
-    height: var(--frame-h);
-    max-height: var(--frame-h);
+    height: auto;
+    max-height: none;
     padding: 0;
     margin: 0;
   }
@@ -1473,8 +1490,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
   }
   .feed-slide {
     padding: 0;
-    height: var(--post-h);
-    min-height: var(--post-h);
+    height: 100%;
+    min-height: 100%;
   }
   .tiktok-row {
     width: 100%;
@@ -1494,9 +1511,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
     top: calc(12px + env(safe-area-inset-top));
   }
   .panel-view {
-    height: var(--frame-h);
-    max-height: var(--frame-h);
+    flex: 1;
     min-height: 0;
+    height: auto;
+    max-height: none;
     padding: 0;
     align-items: stretch;
     background: #fff;
@@ -1548,14 +1566,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
   }
   .panel-empty {
     margin: 0 auto;
-    padding: 56px 28px calc(var(--tabbar-h) + 40px);
+    padding: 56px 28px 40px;
     text-align: center;
     justify-items: center;
   }
   .media-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px;
-    padding: 2px 0 calc(var(--tabbar-h) + 8px);
+    padding: 2px 0 12px;
   }
   .profile-section .media-grid {
     margin: 0 -16px;
@@ -1582,7 +1600,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
     height: 28px;
   }
   .upload-form {
-    padding: 16px 16px calc(var(--tabbar-h) + 20px);
+    padding: 16px 16px 24px;
     gap: 14px;
   }
   .upload-drop {
@@ -1655,7 +1673,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
   }
   .profile-footer-actions {
     margin: 0;
-    padding: 20px 16px calc(var(--tabbar-h) + 24px);
+    padding: 20px 16px 28px;
   }
   .profile-footer-actions .lesson-primary {
     width: 100%;
@@ -1668,8 +1686,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid #111; outline-off
     display: none;
   }
   .action-rail {
-    right: 12px;
-    bottom: 20px;
+    right: 10px;
+    bottom: 24px;
+    gap: 12px;
+    padding: 6px;
+  }
+  .action-icon {
+    width: 44px;
+    height: 44px;
   }
   .comments-sidebar {
     top: auto;
