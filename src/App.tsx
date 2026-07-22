@@ -959,7 +959,6 @@ function App() {
           <p className="mobile-page-title">Saved</p>
           <header className="panel-header">
             <h1>Saved</h1>
-            <p>{savedPosts.length === 0 ? 'Nothing saved yet.' : `${savedPosts.length} saved`}</p>
           </header>
 
           {savedPosts.length > 0 && (
@@ -1038,7 +1037,6 @@ function App() {
           <p className="mobile-page-title">Upload</p>
           <header className="panel-header">
             <h1>Upload</h1>
-            <p>Add a study video to your class feed.</p>
           </header>
           <form className="upload-form" onSubmit={submitUpload}>
             <div

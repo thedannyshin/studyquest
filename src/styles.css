@@ -1692,13 +1692,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     top: 0;
     z-index: 6;
     margin: 0;
-    padding: calc(12px + env(safe-area-inset-top)) 56px 12px;
+    padding: calc(10px + env(safe-area-inset-top)) 56px 10px;
+    line-height: 40px;
     text-align: center;
     font-size: 15px;
     font-weight: 700;
     letter-spacing: -.2px;
     color: #f2f2f2;
     background: #141414;
+  }
+  .panel-header:not(.profile-header) {
+    display: none;
   }
   .panel-header {
     position: static;
@@ -1714,15 +1718,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   .panel-header h1 {
     display: none;
   }
-  .panel-header p {
-    font-size: 13px;
-  }
   .panel-tabs {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin: 0;
-    padding: 4px 16px 16px;
+    padding: 0 16px 16px;
     border-bottom: 0;
   }
   .panel-tabs button {
