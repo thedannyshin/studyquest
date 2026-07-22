@@ -327,6 +327,7 @@ function App() {
   const [uploadDragging, setUploadDragging] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [showAllDues, setShowAllDues] = useState(false)
   const feedRef = useRef<HTMLElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
@@ -585,6 +586,7 @@ function App() {
     feedRef.current?.scrollTo({ top: 0 })
     setActiveIndex(0)
     setCommentsOpen(false)
+    setShowAllDues(false)
   }, [selectedClass])
 
   useEffect(() => {
@@ -827,27 +829,13 @@ function App() {
               {item.type === 'due' ? (
                 <div className="tiktok-row">
                   <article className="post-frame due">
-                    {selectedClass !== 'All' && (
-                      <div className="post-top-left">
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => setSelectedClass(selectedClass)}
-                          aria-label={selectedClass}
-                        >
-                          <span className="action-icon class-avatar">
-                            {(() => {
-                              const Icon = classFilters.find((item) => item.id === selectedClass)?.Icon ?? BookOpen
-                              return <Icon size={20} strokeWidth={2.2} />
-                            })()}
-                          </span>
-                        </button>
-                      </div>
-                    )}
                     <div className="due-panel">
                       <h2>From your {providerLabel}</h2>
                       <ul className="due-list">
-                        {item.items.map((due) => (
+                        {(showAllDues
+                          ? [...upcomingItems].sort((a, b) => a.dueOffset - b.dueOffset)
+                          : item.items
+                        ).map((due) => (
                           <li key={due.id}>
                             <a
                               href={due.urls[provider ?? 'Google Classroom']}
@@ -866,6 +854,17 @@ function App() {
                           </li>
                         ))}
                       </ul>
+                      {selectedClass !== 'All'
+                        && upcomingItems.some((due) => due.classCode !== selectedClass)
+                        && (
+                        <button
+                          type="button"
+                          className="due-more"
+                          onClick={() => setShowAllDues((open) => !open)}
+                        >
+                          {showAllDues ? 'Show this class only' : 'See other classes'}
+                        </button>
+                      )}
                     </div>
                   </article>
                 </div>
@@ -909,7 +908,6 @@ function App() {
                   active={index === activeIndex}
                   commentsOpen={commentsOpen && index === activeIndex}
                   onCommentsOpenChange={setCommentsOpen}
-                  onClassClick={openFeedClass}
                   onCheck={recordCheck}
                   onComplete={() => markComplete(item.post.id)}
                   onNext={() => scrollFeed(1)}
@@ -1231,7 +1229,6 @@ function PostCard({
   active,
   commentsOpen,
   onCommentsOpenChange,
-  onClassClick,
   onCheck,
   onComplete,
   onNext,
@@ -1245,7 +1242,6 @@ function PostCard({
   active: boolean
   commentsOpen: boolean
   onCommentsOpenChange: (open: boolean) => void
-  onClassClick: (classCode: string) => void
   onCheck: (topic: string, correct: boolean) => void
   onComplete: () => void
   onNext: () => void
@@ -1265,6 +1261,7 @@ function PostCard({
   const [shareOpen, setShareOpen] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
+  const [classOpen, setClassOpen] = useState(false)
   const recordedRef = useRef(false)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
@@ -1280,7 +1277,10 @@ function PostCard({
   const ClassIcon = classMeta?.Icon ?? BookOpen
 
   useEffect(() => {
-    if (!active) setCreditOpen(false)
+    if (!active) {
+      setCreditOpen(false)
+      setClassOpen(false)
+    }
   }, [active])
 
   useEffect(() => {
@@ -1496,7 +1496,10 @@ function PostCard({
               className="post-credit-btn"
               aria-label="Post info"
               aria-expanded={creditOpen}
-              onClick={() => setCreditOpen((open) => !open)}
+              onClick={() => {
+                setClassOpen(false)
+                setCreditOpen((open) => !open)
+              }}
             >
               <Info size={18} strokeWidth={2.2} />
             </button>
@@ -1611,16 +1614,27 @@ function PostCard({
           )}
 
           <aside className="action-rail" aria-label="Post actions">
-            <button
-              type="button"
-              className="action-btn"
-              onClick={() => onClassClick(post.classCode)}
-              aria-label={post.classCode}
-            >
-              <span className="action-icon class-avatar">
-                <ClassIcon size={20} strokeWidth={2.2} />
-              </span>
-            </button>
+            <div className={`action-class ${classOpen ? 'open' : ''}`}>
+              <button
+                type="button"
+                className="action-btn"
+                aria-label="Class"
+                aria-expanded={classOpen}
+                onClick={() => {
+                  setCreditOpen(false)
+                  setClassOpen((open) => !open)
+                }}
+              >
+                <span className="action-icon class-avatar">
+                  <ClassIcon size={20} strokeWidth={2.2} />
+                </span>
+              </button>
+              {classOpen && (
+                <div className="action-class-tip">
+                  <p>{classMeta?.label ?? post.classCode}</p>
+                </div>
+              )}
+            </div>
 
             {post.modality === 'video' && (
               <button
