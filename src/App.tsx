@@ -20,7 +20,9 @@ import {
   Play,
   Plus,
   Send,
+  FileText,
   User,
+  Video,
   X,
 } from 'lucide-react'
 
@@ -50,9 +52,29 @@ type Post = {
   quiz?: Quiz
   privacy?: 'classmates' | 'only-me'
   postedBy?: string
+  generatedFrom?: string
 }
 
 type UploadPrivacy = 'classmates' | 'only-me'
+type UploadMode = 'video' | 'generate'
+
+const MATERIAL_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'key', 'txt', 'pages', 'odt', 'odp']
+const MATERIAL_ACCEPT =
+  '.pdf,.doc,.docx,.ppt,.pptx,.key,.txt,.pages,.odt,.odp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain'
+const GENERATED_VIDEO_PLACEHOLDER = '/biology-water.mp4'
+
+function isMaterialFile(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (extension && MATERIAL_EXTENSIONS.includes(extension)) return true
+  const type = file.type.toLowerCase()
+  return (
+    type.includes('pdf') ||
+    type.includes('document') ||
+    type.includes('presentation') ||
+    type.includes('msword') ||
+    type === 'text/plain'
+  )
+}
 
 const classes = ['BIO 102', 'CHEM 101', 'HIST 204']
 
@@ -322,14 +344,19 @@ function App() {
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [uploadClass, setUploadClass] = useState(classes[0])
   const [uploadPrivacy, setUploadPrivacy] = useState<UploadPrivacy>('classmates')
+  const [uploadMode, setUploadMode] = useState<UploadMode>('video')
   const [uploadFileName, setUploadFileName] = useState('')
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
+  const [uploadMaterialName, setUploadMaterialName] = useState('')
   const [uploadDragging, setUploadDragging] = useState(false)
+  const [uploadMaterialDragging, setUploadMaterialDragging] = useState(false)
+  const [uploadGenerating, setUploadGenerating] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showAllDues, setShowAllDues] = useState(false)
   const feedRef = useRef<HTMLElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  const uploadMaterialInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (screen === 'feed') writeSession(true, provider)
@@ -395,7 +422,10 @@ function App() {
   }
 
   const applyUploadFile = (file: File | undefined) => {
-    if (!file || !file.type.startsWith('video/')) return
+    if (!file || !file.type.startsWith('video/')) {
+      setUploadError('Choose an MP4, WebM, or MOV video.')
+      return
+    }
     const objectUrl = URL.createObjectURL(file)
     const probe = document.createElement('video')
     probe.preload = 'metadata'
@@ -423,6 +453,46 @@ function App() {
       setUploadFileName('')
     }
     probe.src = objectUrl
+  }
+
+  const applyUploadMaterial = (file: File | undefined) => {
+    if (!file) return
+    if (!isMaterialFile(file)) {
+      setUploadError('Use a PDF, slides, or document file.')
+      setUploadMaterialName('')
+      if (uploadMaterialInputRef.current) uploadMaterialInputRef.current.value = ''
+      return
+    }
+    setUploadError('')
+    setUploadMaterialName(file.name)
+  }
+
+  const switchUploadMode = (mode: UploadMode) => {
+    if (mode === uploadMode) return
+    setUploadMode(mode)
+    setUploadError('')
+    if (mode === 'video') {
+      setUploadMaterialName('')
+      if (uploadMaterialInputRef.current) uploadMaterialInputRef.current.value = ''
+    } else {
+      if (uploadPreview) URL.revokeObjectURL(uploadPreview)
+      setUploadPreview(null)
+      setUploadFileName('')
+      if (uploadInputRef.current) uploadInputRef.current.value = ''
+    }
+  }
+
+  const resetUploadForm = () => {
+    if (uploadPreview) URL.revokeObjectURL(uploadPreview)
+    setUploadPreview(null)
+    setUploadFileName('')
+    setUploadMaterialName('')
+    setUploadClass(classes[0])
+    setUploadPrivacy('classmates')
+    setUploadError('')
+    setUploadGenerating(false)
+    if (uploadInputRef.current) uploadInputRef.current.value = ''
+    if (uploadMaterialInputRef.current) uploadMaterialInputRef.current.value = ''
   }
 
   const toggleSaved = (postId: number) => {
@@ -460,15 +530,48 @@ function App() {
     setScreen('auth')
   }
 
-  const uploadReady = Boolean(uploadPreview && !uploadError && uploadClass && uploadPrivacy)
+  const uploadReady =
+    uploadMode === 'video'
+      ? Boolean(uploadPreview && !uploadError && uploadClass && uploadPrivacy)
+      : Boolean(uploadMaterialName && !uploadError && uploadClass && uploadPrivacy && !uploadGenerating)
 
   const submitUpload = (event: FormEvent) => {
     event.preventDefault()
-    if (!uploadReady || !uploadPreview) return
+    if (!uploadReady) return
+
     const nextId = Math.max(0, ...allPosts.map((post) => post.id)) + 1
-    const title = uploadFileName.replace(/\.[^.]+$/, '') || 'Untitled video'
     const classCode = uploadClass
     const privacy = uploadPrivacy
+
+    if (uploadMode === 'generate') {
+      const materialName = uploadMaterialName
+      const title = materialName.replace(/\.[^.]+$/, '') || 'Generated study video'
+      setUploadGenerating(true)
+      window.setTimeout(() => {
+        setUserPosts((current) => [
+          {
+            id: nextId,
+            classCode,
+            title,
+            modality: 'video',
+            topic: 'uploaded',
+            sourceLabel: materialName,
+            video: GENERATED_VIDEO_PLACEHOLDER,
+            privacy,
+            postedBy: 'Study Quest AI',
+            generatedFrom: materialName,
+          },
+          ...current,
+        ])
+        resetUploadForm()
+        setSelectedClass(classCode)
+        setMainView('feed')
+      }, 2400)
+      return
+    }
+
+    if (!uploadPreview) return
+    const title = uploadFileName.replace(/\.[^.]+$/, '') || 'Untitled video'
     const videoUrl = uploadPreview
     setUserPosts((current) => [
       {
@@ -484,11 +587,7 @@ function App() {
       },
       ...current,
     ])
-    setUploadPreview(null)
-    setUploadFileName('')
-    setUploadClass(classes[0])
-    setUploadPrivacy('classmates')
-    if (uploadInputRef.current) uploadInputRef.current.value = ''
+    resetUploadForm()
     setSelectedClass(classCode)
     setMainView('feed')
   }
@@ -1038,63 +1137,152 @@ function App() {
           <header className="panel-header">
             <h1>Upload</h1>
           </header>
+          <div className="panel-tabs upload-tabs" role="tablist" aria-label="Upload type">
+            {(
+              [
+                { id: 'video', label: 'Video', Icon: Video },
+                { id: 'generate', label: 'Generate', Icon: FileText },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={uploadMode === tab.id}
+                className={uploadMode === tab.id ? 'active' : ''}
+                onClick={() => switchUploadMode(tab.id)}
+              >
+                <tab.Icon size={15} strokeWidth={2.2} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <form className="upload-form" onSubmit={submitUpload}>
-            <div
-              className={`upload-drop ${uploadPreview ? 'has-preview' : ''} ${uploadDragging ? 'dragging' : ''}`}
-              onDragEnter={(event) => {
-                event.preventDefault()
-                setUploadDragging(true)
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDragLeave={() => setUploadDragging(false)}
-              onDrop={(event) => {
-                event.preventDefault()
-                setUploadDragging(false)
-                applyUploadFile(event.dataTransfer.files?.[0])
-              }}
-            >
-              {!uploadPreview && (
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  accept="video/mp4,video/webm,video/quicktime,video/*"
-                  aria-label="Choose video"
-                  onChange={(event) => applyUploadFile(event.target.files?.[0])}
-                />
-              )}
-              {uploadPreview ? (
-                <>
-                  <video src={uploadPreview} controls playsInline />
-                  <button
-                    type="button"
-                    className="upload-replace"
-                    onClick={() => uploadInputRef.current?.click()}
-                  >
-                    Change video
-                  </button>
+            {uploadMode === 'video' ? (
+              <div
+                className={`upload-drop ${uploadPreview ? 'has-preview' : ''} ${uploadDragging ? 'dragging' : ''}`}
+                onDragEnter={(event) => {
+                  event.preventDefault()
+                  setUploadDragging(true)
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={() => setUploadDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  setUploadDragging(false)
+                  applyUploadFile(event.dataTransfer.files?.[0])
+                }}
+              >
+                {!uploadPreview && (
                   <input
                     ref={uploadInputRef}
                     type="file"
                     accept="video/mp4,video/webm,video/quicktime,video/*"
-                    className="upload-replace-input"
-                    aria-label="Change video"
+                    aria-label="Choose video"
                     onChange={(event) => applyUploadFile(event.target.files?.[0])}
                   />
-                </>
-              ) : (
-                <div className="upload-pick">
-                  <Plus size={28} strokeWidth={2} />
-                  <strong>Drop a 1 min or less video</strong>
-                  <span>MP4, WebM, or MOV</span>
-                </div>
-              )}
-            </div>
-            {uploadFileName && <p className="upload-filename">{uploadFileName}</p>}
+                )}
+                {uploadPreview ? (
+                  <>
+                    <video src={uploadPreview} controls playsInline />
+                    <button
+                      type="button"
+                      className="upload-replace"
+                      onClick={() => uploadInputRef.current?.click()}
+                    >
+                      Change video
+                    </button>
+                    <input
+                      ref={uploadInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,video/*"
+                      className="upload-replace-input"
+                      aria-label="Change video"
+                      onChange={(event) => applyUploadFile(event.target.files?.[0])}
+                    />
+                  </>
+                ) : (
+                  <div className="upload-pick">
+                    <Video size={28} strokeWidth={2} />
+                    <strong>Drop a 1 min or less video</strong>
+                    <span>MP4, WebM, or MOV</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                className={`upload-drop upload-drop-material ${uploadMaterialName ? 'has-file' : ''} ${uploadMaterialDragging ? 'dragging' : ''} ${uploadGenerating ? 'generating' : ''}`}
+                onDragEnter={(event) => {
+                  event.preventDefault()
+                  if (!uploadGenerating) setUploadMaterialDragging(true)
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={() => setUploadMaterialDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  setUploadMaterialDragging(false)
+                  if (!uploadGenerating) applyUploadMaterial(event.dataTransfer.files?.[0])
+                }}
+              >
+                {!uploadMaterialName && !uploadGenerating && (
+                  <input
+                    ref={uploadMaterialInputRef}
+                    type="file"
+                    accept={MATERIAL_ACCEPT}
+                    aria-label="Choose study materials"
+                    onChange={(event) => applyUploadMaterial(event.target.files?.[0])}
+                  />
+                )}
+                {uploadGenerating ? (
+                  <div className="upload-pick">
+                    <span className="upload-generating-spinner" aria-hidden="true" />
+                    <strong>Generating your video…</strong>
+                    <span>Study Quest AI is turning your file into a short clip.</span>
+                  </div>
+                ) : uploadMaterialName ? (
+                  <>
+                    <div className="upload-pick upload-file-picked">
+                      <FileText size={32} strokeWidth={2} />
+                      <strong>{uploadMaterialName}</strong>
+                      <span>Ready to generate</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="upload-replace"
+                      onClick={() => uploadMaterialInputRef.current?.click()}
+                    >
+                      Change file
+                    </button>
+                    <input
+                      ref={uploadMaterialInputRef}
+                      type="file"
+                      accept={MATERIAL_ACCEPT}
+                      className="upload-replace-input"
+                      aria-label="Change study materials"
+                      onChange={(event) => applyUploadMaterial(event.target.files?.[0])}
+                    />
+                  </>
+                ) : (
+                  <div className="upload-pick">
+                    <FileText size={28} strokeWidth={2} />
+                    <strong>Drop slides, PDFs, or notes</strong>
+                    <span>Study Quest AI turns them into a short video</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {uploadMode === 'video' && uploadFileName && (
+              <p className="upload-filename">{uploadFileName}</p>
+            )}
             {uploadError && <p className="upload-error">{uploadError}</p>}
 
             <label>
               Class
-              <select value={uploadClass} onChange={(event) => setUploadClass(event.target.value)}>
+              <select
+                value={uploadClass}
+                disabled={uploadGenerating}
+                onChange={(event) => setUploadClass(event.target.value)}
+              >
                 {classes.map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
@@ -1105,6 +1293,7 @@ function App() {
               Who can watch
               <select
                 value={uploadPrivacy}
+                disabled={uploadGenerating}
                 onChange={(event) => setUploadPrivacy(event.target.value as UploadPrivacy)}
               >
                 <option value="classmates">Classmates</option>
@@ -1114,7 +1303,11 @@ function App() {
 
             <div className="lesson-actions">
               <button className="lesson-primary" type="submit" disabled={!uploadReady}>
-                Post
+                {uploadMode === 'generate'
+                  ? uploadGenerating
+                    ? 'Generating…'
+                    : 'Generate video'
+                  : 'Post'}
               </button>
             </div>
           </form>
@@ -1537,7 +1730,9 @@ function PostCard({
                 )}
                 <p className="post-credit-meta">
                   Source:{' '}
-                  {!post.postedBy || post.postedBy === 'Study Quest AI' ? (
+                  {post.generatedFrom ? (
+                    post.generatedFrom
+                  ) : !post.postedBy || post.postedBy === 'Study Quest AI' ? (
                     <a href={sourceUrl} target="_blank" rel="noreferrer">
                       {sourceProvider}
                     </a>

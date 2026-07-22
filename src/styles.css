@@ -443,6 +443,21 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   display: grid;
   gap: 16px;
 }
+.upload-tabs {
+  margin: 0 0 18px;
+}
+.upload-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.upload-replace-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .upload-form label {
   display: grid;
   gap: 8px;
@@ -493,6 +508,37 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   height: 0;
   opacity: 0;
   pointer-events: none;
+}
+.upload-drop.has-file,
+.upload-drop.generating {
+  border-style: solid;
+  border-color: #333;
+  background: #141414;
+}
+.upload-drop.has-file input[type='file'],
+.upload-drop.generating input[type='file'] {
+  inset: auto;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.upload-file-picked strong {
+  max-width: min(280px, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-generating-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #333;
+  border-top-color: #f2f2f2;
+  border-radius: 50%;
+  animation: upload-spin .8s linear infinite;
+}
+@keyframes upload-spin {
+  to { transform: rotate(360deg); }
 }
 .upload-drop video {
   width: 100%;
