@@ -201,6 +201,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   padding: 6px 10px 4px;
   font-size: 20px;
 }
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.sidebar-brand .wordmark {
+  min-width: 0;
+}
+.sidebar-close {
+  display: none;
+}
 .sidebar-nav {
   display: grid;
   gap: 2px;
@@ -1427,18 +1440,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     position: fixed;
     top: calc(10px + env(safe-area-inset-top));
     left: 12px;
-    z-index: 62;
+    z-index: 55;
     width: 40px;
     height: 40px;
     border: 0;
-    border-radius: 50%;
-    background: rgba(20, 20, 20, 0.92);
+    border-radius: 0;
+    background: transparent;
     color: #f2f2f2;
     cursor: pointer;
-    box-shadow:
-      0 2px 10px rgba(0, 0, 0, 0.45),
-      0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: none;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.65));
     -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-menu-btn[hidden] {
+    display: none;
   }
   .mobile-nav-backdrop {
     display: block;
@@ -1468,6 +1483,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   .app-sidebar.open {
     transform: translateX(0);
     box-shadow: 12px 0 40px rgba(0, 0, 0, 0.18);
+  }
+  .sidebar-close {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    margin-right: 4px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #f2f2f2;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sidebar-close:hover {
+    background: #1c1c1c;
+  }
+  .sidebar-brand .wordmark {
+    padding-right: 0;
   }
   .mobile-topbar {
     display: none;

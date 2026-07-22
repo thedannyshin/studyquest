@@ -713,15 +713,16 @@ function App() {
       <button
         type="button"
         className="mobile-menu-btn"
-        aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+        aria-label="Open menu"
         aria-expanded={mobileNavOpen}
         aria-controls="app-sidebar"
+        hidden={mobileNavOpen}
         onClick={() => {
           setCommentsOpen(false)
-          setMobileNavOpen((open) => !open)
+          setMobileNavOpen(true)
         }}
       >
-        {mobileNavOpen ? <X size={22} strokeWidth={2.2} /> : <Menu size={22} strokeWidth={2.2} />}
+        <Menu size={22} strokeWidth={2.2} />
       </button>
 
       {mobileNavOpen && (
@@ -735,7 +736,17 @@ function App() {
 
       <aside id="app-sidebar" className={`app-sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="Study Quest">
         <div className="sidebar-top">
-          <div className="wordmark">Study Quest</div>
+          <div className="sidebar-brand">
+            <div className="wordmark">Study Quest</div>
+            <button
+              type="button"
+              className="sidebar-close"
+              aria-label="Close menu"
+              onClick={() => setMobileNavOpen(false)}
+            >
+              <X size={20} strokeWidth={2.2} />
+            </button>
+          </div>
 
           <nav className="sidebar-nav" aria-label="Main">
             <div className="nav-block">
