@@ -188,7 +188,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   background: #141414;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 20px 10px 12px;
   z-index: 20;
 }
@@ -280,9 +280,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 }
 .nav-sub > button:hover {
   background: #1a1a1a;
-}
-.sidebar-profile {
-  margin-top: 12px;
 }
 .mobile-tabbar,
 .mobile-menu-btn,
@@ -828,31 +825,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   top: 14px;
   left: 14px;
   z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  max-width: calc(100% - 88px);
-}
-.post-class {
-  border: 0;
-  background: none;
-  color: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0;
-  text-shadow: 0 1px 6px rgba(0,0,0,.35);
 }
 .post-privacy {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 4;
   font-size: 12px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 6px rgba(0,0,0,.35);
-}
-.post-frame.assignment .post-class {
-  color: #8a8a8a;
-  text-shadow: none;
 }
 .post-frame.assignment .post-privacy {
   color: #8a8a8a;
@@ -860,10 +842,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 }
 .post-credit {
   position: absolute;
-  left: 14px;
-  bottom: 20px;
+  top: 14px;
+  right: 14px;
+  left: auto;
+  bottom: auto;
   z-index: 4;
   display: flex;
+  flex-direction: row-reverse;
   align-items: center;
   gap: 8px;
   max-width: calc(100% - 88px);
@@ -883,15 +868,32 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 }
 .post-credit-tip {
   margin: 0;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(10, 10, 10, 0.78);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(10, 10, 10, 0.82);
   color: #f2f2f2;
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.35;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  min-width: 0;
+}
+.post-credit-tip p {
+  margin: 0;
+}
+.post-credit-meta {
+  font-weight: 500;
+  color: #8a8a8a;
+}
+.post-credit-tip a {
+  color: #f2f2f2;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .post-frame.assignment .post-credit-btn {
   color: #8a8a8a;
@@ -1045,6 +1047,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   box-shadow:
     0 1px 2px rgba(255, 255, 255, 0.06),
     0 4px 16px rgba(255, 255, 255, 0.1);
+}
+.action-icon.class-avatar {
+  background: #1a1a1a;
+  color: #f2f2f2;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.post-frame.assignment .action-icon.class-avatar {
+  background: #2a2a2a;
+  color: #f2f2f2;
 }
 .comments-sidebar {
   position: fixed;
@@ -1604,13 +1617,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     flex: none;
     border-radius: 0;
   }
-  .post-top-left {
+  .post-top-left,
+  .post-privacy {
     top: calc(12px + env(safe-area-inset-top));
     left: 52px;
   }
   .post-credit {
-    left: 12px;
-    bottom: 24px;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 12px;
+    left: auto;
+    bottom: auto;
   }
   .panel-view {
     flex: 1;
@@ -1625,16 +1641,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     width: 100%;
   }
   .panel-header {
-    position: sticky;
-    top: 0;
-    z-index: 5;
+    position: static;
+    z-index: auto;
     margin: 0;
-    padding: calc(12px + env(safe-area-inset-top)) 16px 12px 58px;
-    background: rgba(10, 10, 10, 0.92);
-    backdrop-filter: saturate(180%) blur(16px);
-    -webkit-backdrop-filter: saturate(180%) blur(16px);
-    border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
-    gap: 2px;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 10px 58px;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: 0;
+    gap: 4px;
   }
   .panel-header h1 {
     font-size: 28px;
@@ -1644,38 +1659,38 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     font-size: 13px;
   }
   .panel-tabs {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin: 0;
-    padding: 0 8px;
-    border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+    padding: 4px 16px 16px;
+    border-bottom: 0;
   }
   .panel-tabs button {
-    height: 42px;
-    padding: 0;
-    border-radius: 0;
-    background: transparent;
-    color: #8e8e93;
-    font-size: 14px;
-    font-weight: 600;
-    border-bottom: 2px solid transparent;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: #1c1c1c;
+    color: #8a8a8a;
+    font-size: 13px;
+    font-weight: 700;
+    border-bottom: 0;
   }
   .panel-tabs button.active {
-    background: transparent;
-    color: #f2f2f2;
-    border-bottom-color: #f2f2f2;
+    background: #f2f2f2;
+    color: #0a0a0a;
+    border-bottom-color: transparent;
   }
   .panel-empty {
     margin: 0 auto;
-    padding: 56px 28px 40px;
+    padding: 48px 28px 40px;
     text-align: center;
     justify-items: center;
   }
   .media-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px;
-    padding: 2px 0 12px;
+    padding: 0 0 12px;
   }
   .profile-section .media-grid {
     margin: 0 -16px;
@@ -1702,7 +1717,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     height: 28px;
   }
   .upload-form {
-    padding: 16px 16px 24px;
+    padding: 8px 16px 28px;
     gap: 14px;
   }
   .upload-drop {
@@ -1716,7 +1731,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     text-align: left;
     gap: 14px;
     margin: 0;
-    padding: calc(14px + env(safe-area-inset-top)) 16px 16px 58px;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 20px 58px;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: 0;
   }
   .profile-avatar {
     width: 64px;
@@ -1734,9 +1753,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   }
   .profile-section {
     margin: 0;
-    padding: 18px 16px 8px;
+    padding: 8px 16px 20px;
     gap: 12px;
-    border-bottom: 8px solid #111;
+    border-bottom: 0;
+  }
+  .profile-section + .profile-section {
+    padding-top: 4px;
   }
   .profile-section:last-of-type {
     border-bottom: 0;

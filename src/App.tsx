@@ -797,17 +797,17 @@ function App() {
               <Plus size={22} strokeWidth={mainView === 'upload' ? 2.4 : 2} />
               <span>Upload</span>
             </button>
+
+            <button
+              type="button"
+              className={`nav-parent ${mainView === 'profile' ? 'active' : ''}`}
+              onClick={() => openMainView('profile')}
+            >
+              <User size={22} strokeWidth={mainView === 'profile' ? 2.4 : 2} />
+              <span>Profile</span>
+            </button>
           </nav>
         </div>
-
-        <button
-          type="button"
-          className={`nav-parent sidebar-profile ${mainView === 'profile' ? 'active' : ''}`}
-          onClick={() => openMainView('profile')}
-        >
-          <User size={22} strokeWidth={mainView === 'profile' ? 2.4 : 2} />
-          <span>Profile</span>
-        </button>
       </aside>
 
       {mainView === 'feed' ? (
@@ -831,10 +831,16 @@ function App() {
                       <div className="post-top-left">
                         <button
                           type="button"
-                          className="post-class"
+                          className="action-btn"
                           onClick={() => setSelectedClass(selectedClass)}
+                          aria-label={selectedClass}
                         >
-                          {selectedClass}
+                          <span className="action-icon class-avatar">
+                            {(() => {
+                              const Icon = classFilters.find((item) => item.id === selectedClass)?.Icon ?? BookOpen
+                              return <Icon size={20} strokeWidth={2.2} />
+                            })()}
+                          </span>
                         </button>
                       </div>
                     )}
@@ -869,10 +875,16 @@ function App() {
                     <div className="post-top-left">
                       <button
                         type="button"
-                        className="post-class"
+                        className="action-btn"
                         onClick={() => setSelectedClass(assignment.classCode)}
+                        aria-label={assignment.classCode}
                       >
-                        {assignment.classCode}
+                        <span className="action-icon class-avatar">
+                          {(() => {
+                            const Icon = classFilters.find((item) => item.id === assignment.classCode)?.Icon ?? BookOpen
+                            return <Icon size={20} strokeWidth={2.2} />
+                          })()}
+                        </span>
                       </button>
                     </div>
                     <div className="assignment-content">
@@ -893,6 +905,7 @@ function App() {
                 <PostCard
                   post={item.post}
                   sourceUrl={sourceUrl}
+                  sourceProvider={providerLabel}
                   active={index === activeIndex}
                   commentsOpen={commentsOpen && index === activeIndex}
                   onCommentsOpenChange={setCommentsOpen}
@@ -1214,6 +1227,7 @@ function App() {
 function PostCard({
   post,
   sourceUrl,
+  sourceProvider,
   active,
   commentsOpen,
   onCommentsOpenChange,
@@ -1227,6 +1241,7 @@ function PostCard({
 }: {
   post: Post
   sourceUrl: string
+  sourceProvider: string
   active: boolean
   commentsOpen: boolean
   onCommentsOpenChange: (open: boolean) => void
@@ -1261,6 +1276,8 @@ function PostCard({
     ? answer.trim().toLowerCase() === quiz.answer.toLowerCase()
     : false
   const title = post.modality === 'drill' && quiz ? quiz.question : post.title
+  const classMeta = classFilters.find((item) => item.id === post.classCode)
+  const ClassIcon = classMeta?.Icon ?? BookOpen
 
   useEffect(() => {
     if (!active) setCreditOpen(false)
@@ -1469,33 +1486,38 @@ function PostCard({
     <>
       <div className="tiktok-row">
         <article className={`post-frame ${post.modality}${completed ? ' done' : ''}`} id={`lesson-${post.id}`}>
-          <div className="post-top-left">
-            <button type="button" className="post-class" onClick={() => onClassClick(post.classCode)}>
-              {post.classCode}
-            </button>
-            {post.privacy === 'only-me' && <span className="post-privacy">Only you</span>}
-          </div>
-
-          {post.modality === 'video' && (
-            <div className={`post-credit ${creditOpen ? 'open' : ''}`}>
-              <button
-                type="button"
-                className="post-credit-btn"
-                aria-label="Video credit"
-                aria-expanded={creditOpen}
-                onClick={() => setCreditOpen((open) => !open)}
-              >
-                <Info size={18} strokeWidth={2.2} />
-              </button>
-              {creditOpen && (
-                <p className="post-credit-tip">
-                  {post.postedBy === 'Study Quest AI'
-                    ? 'Study Quest AI generated'
-                    : `${post.postedBy ?? PROFILE_NAME} posted`}
-                </p>
-              )}
-            </div>
+          {post.privacy === 'only-me' && (
+            <span className="post-privacy">Only you</span>
           )}
+
+          <div className={`post-credit ${creditOpen ? 'open' : ''}`}>
+            <button
+              type="button"
+              className="post-credit-btn"
+              aria-label="Post info"
+              aria-expanded={creditOpen}
+              onClick={() => setCreditOpen((open) => !open)}
+            >
+              <Info size={18} strokeWidth={2.2} />
+            </button>
+            {creditOpen && (
+              <div className="post-credit-tip">
+                {post.modality === 'video' && (
+                  <p>
+                    {post.postedBy === 'Study Quest AI'
+                      ? 'Study Quest AI generated'
+                      : `${post.postedBy ?? PROFILE_NAME} posted`}
+                  </p>
+                )}
+                {post.sourceLabel && post.sourceLabel !== 'Your upload' && (
+                  <p className="post-credit-meta">{post.sourceLabel}</p>
+                )}
+                <a href={sourceUrl} target="_blank" rel="noreferrer">
+                  Open in {sourceProvider}
+                </a>
+              </div>
+            )}
+          </div>
 
           {completed && post.modality === 'video' ? (
             <div className="video-end">
@@ -1583,6 +1605,17 @@ function PostCard({
           )}
 
           <aside className="action-rail" aria-label="Post actions">
+            <button
+              type="button"
+              className="action-btn"
+              onClick={() => onClassClick(post.classCode)}
+              aria-label={post.classCode}
+            >
+              <span className="action-icon class-avatar">
+                <ClassIcon size={20} strokeWidth={2.2} />
+              </span>
+            </button>
+
             {post.modality === 'video' && (
               <button
                 type="button"
@@ -1616,10 +1649,6 @@ function PostCard({
             >
               <span className="action-icon"><Link size={20} /></span>
             </button>
-
-            <a className="action-btn" href={sourceUrl} target="_blank" rel="noreferrer" aria-label="Source">
-              <span className="action-icon"><BookOpen size={20} /></span>
-            </a>
           </aside>
         </article>
       </div>
