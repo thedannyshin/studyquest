@@ -7,11 +7,9 @@
   background: #0a0a0a;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --accent: #39ff14;
-  --accent-hover: #52ff3d;
-  --accent-ink: #041404;
-  --accent-muted: rgba(57, 255, 20, 0.14);
-  --accent-border: rgba(57, 255, 20, 0.45);
+  --accent: #6bbdb5;
+  --accent-hover: #7fccc4;
+  --accent-ink: #0a0a0a;
 }
 
 * { box-sizing: border-box; }
@@ -29,7 +27,7 @@ body {
 }
 button, input { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-offset: 2px; }
 
 .wordmark {
   display: flex;
@@ -113,7 +111,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-weight: 700;
   cursor: pointer;
   margin-left: 5px;
-  color: var(--accent);
 }
 
 /* Onboarding */
@@ -162,7 +159,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border-radius: 10px;
   cursor: pointer;
 }
-.provider-list > button:hover { border-color: var(--accent); }
+.provider-list > button:hover { border-color: #f2f2f2; }
 .provider-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 8px; font-weight: 800; }
 .classroom { background: #f2f2f2; color: #0a0a0a; }
 .canvas { border: 2px solid #f2f2f2; }
@@ -171,7 +168,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* Sync */
 .sync-card { text-align: center; }
 .progress-track { height: 4px; background: #2a2a2a; border-radius: 5px; overflow: hidden; margin: 0 0 22px; }
-.progress-track span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+.progress-track span { display: block; height: 100%; background: #f2f2f2; transition: width .2s; }
 .sync-status { text-align: left; display: grid; gap: 8px; }
 .sync-status > div { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: #161616; opacity: .45; }
 .sync-status > div.ready { opacity: 1; }
@@ -253,8 +250,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   flex-shrink: 0;
 }
 .nav-parent.active {
-  background: var(--accent-muted);
-  color: var(--accent);
+  background: #1c1c1c;
 }
 .nav-parent:hover {
   background: #1a1a1a;
@@ -285,8 +281,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   flex-shrink: 0;
 }
 .nav-sub > button.active {
-  background: var(--accent-muted);
-  color: var(--accent);
+  background: #1c1c1c;
+  color: #f2f2f2;
   font-weight: 700;
 }
 .nav-sub > button:hover {
@@ -353,8 +349,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   cursor: pointer;
 }
 .panel-tabs button.active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: #f2f2f2;
+  color: #0a0a0a;
 }
 .media-grid {
   list-style: none;
@@ -515,12 +511,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   transition: border-color .15s ease, background .15s ease;
 }
 .upload-drop.dragging {
-  border-color: var(--accent);
+  border-color: #f2f2f2;
   background: #1c1c1c;
 }
 .upload-drop.has-preview {
   border-style: solid;
-  border-color: var(--accent);
+  border-color: #f2f2f2;
   background: #111;
 }
 .upload-drop.has-file,
@@ -539,7 +535,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   width: 28px;
   height: 28px;
   border: 2px solid #333;
-  border-top-color: var(--accent);
+  border-top-color: #f2f2f2;
   border-radius: 50%;
   animation: upload-spin .8s linear infinite;
 }
@@ -580,8 +576,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   padding: 0 12px;
   border: 0;
   border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: #f2f2f2;
+  color: #0a0a0a;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -666,7 +662,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .upload-picker-list button.active,
 .upload-picker-list button:hover {
-  border-color: var(--accent);
+  border-color: #f2f2f2;
   background: #222;
 }
 .upload-picker-icon {
@@ -744,7 +740,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: #f2f2f2;
 }
 .progress-bar.slim {
   height: 5px;
@@ -796,7 +792,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   color: #8a8a8a;
 }
 .progress-status.done {
-  color: var(--accent);
+  color: #f2f2f2;
 }
 .profile-section {
   display: grid;
@@ -959,9 +955,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .video-timeline-fill {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: #f2f2f2;
   border-radius: inherit;
-  box-shadow: 0 0 10px var(--accent-border);
+  box-shadow: none;
 }
 .post-top-left {
   position: absolute;
@@ -1190,8 +1186,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   padding: 0 14px;
   border: 0;
   border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: #f2f2f2;
+  color: #0a0a0a;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -1216,11 +1212,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     0 4px 14px rgba(0, 0, 0, 0.28);
 }
 .action-btn.active .action-icon {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: #f2f2f2;
+  color: #0a0a0a;
   box-shadow:
-    0 1px 2px rgba(57, 255, 20, 0.2),
-    0 4px 16px rgba(57, 255, 20, 0.24);
+    0 1px 2px rgba(255, 255, 255, 0.06),
+    0 4px 16px rgba(255, 255, 255, 0.1);
 }
 .action-icon.class-avatar {
   background: #1a1a1a;
@@ -1373,8 +1369,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   height: 72px;
   margin-bottom: 8px;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: #f2f2f2;
+  color: #0a0a0a;
   display: grid;
   place-items: center;
 }
@@ -1506,7 +1502,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   padding: 0 6px 0 16px;
   gap: 4px;
 }
-.fill-field.correct { border: 2px solid var(--accent); }
+.fill-field.correct { border: 2px solid #fff; }
 .fill-field.wrong { opacity: .6; }
 .fill-answer {
   width: 100%;
@@ -1525,8 +1521,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   height: 42px;
   border: 0;
   border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: #f2f2f2;
+  color: #0a0a0a;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -1600,12 +1596,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-size: 11px;
 }
 .quiz-options button.selected {
-  border: 2px solid var(--accent);
+  border: 2px solid #fff;
   padding: 8px 13px;
 }
 .quiz-options button.correct {
-  border-color: var(--accent);
-  background: var(--accent-muted);
+  border-color: #fff;
+  background: rgba(255,255,255,.16);
 }
 .quiz-options button.wrong {
   border-color: rgba(255,255,255,.55);
@@ -1821,8 +1817,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     border-bottom: 0;
   }
   .panel-tabs button.active {
-    background: var(--accent);
-    color: var(--accent-ink);
+    background: #f2f2f2;
+    color: #0a0a0a;
     border-bottom-color: transparent;
   }
   .panel-empty {
