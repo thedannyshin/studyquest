@@ -274,6 +274,9 @@ const SESSION_KEY = 'study-quest-session'
 const SAVED_KEY = 'study-quest-saved'
 const PROGRESS_KEY = 'study-quest-progress'
 const ANSWERED_KEY = 'study-quest-answered'
+const QUIZ_RESPONSES_KEY = 'study-quest-quiz-responses'
+
+type QuizResponses = Record<number, string>
 const PROFILE_PHOTO = 'https://randomuser.me/api/portraits/women/68.jpg'
 const PROFILE_NAME = 'Alex Morgan'
 const PROFILE_EMAIL = 'alex@northbridge.edu'
@@ -364,6 +367,34 @@ function writeAnsweredIds(ids: number[]) {
   localStorage.setItem(ANSWERED_KEY, JSON.stringify(ids))
 }
 
+function readQuizResponses(): QuizResponses {
+  try {
+    const raw = localStorage.getItem(QUIZ_RESPONSES_KEY)
+    if (!raw) return {}
+    const data = JSON.parse(raw) as unknown
+    if (!data || typeof data !== 'object') return {}
+    const responses: QuizResponses = {}
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      const id = Number(key)
+      if (Number.isFinite(id) && typeof value === 'string') responses[id] = value
+    }
+    return responses
+  } catch {
+    return {}
+  }
+}
+
+function writeQuizResponses(responses: QuizResponses) {
+  localStorage.setItem(QUIZ_RESPONSES_KEY, JSON.stringify(responses))
+}
+
+function mergeAnsweredIds(ids: number[], responses: QuizResponses) {
+  const fromResponses = Object.keys(responses)
+    .map((key) => Number(key))
+    .filter((id) => Number.isFinite(id))
+  return [...new Set([...ids, ...fromResponses])]
+}
+
 function App() {
   const initialSession = useMemo(() => readSession(), [])
   const [screen, setScreen] = useState<Screen>(() => initialSession.screen)
@@ -380,7 +411,10 @@ function App() {
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [savedIds, setSavedIds] = useState<number[]>(() => readSavedIds())
   const [completedIds, setCompletedIds] = useState<number[]>(() => readCompletedIds())
-  const [answeredIds, setAnsweredIds] = useState<number[]>(() => readAnsweredIds())
+  const [quizResponses, setQuizResponses] = useState<QuizResponses>(() => readQuizResponses())
+  const [answeredIds, setAnsweredIds] = useState<number[]>(() => (
+    mergeAnsweredIds(readAnsweredIds(), readQuizResponses())
+  ))
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('all')
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [uploadClass, setUploadClass] = useState(classes[0])
@@ -413,6 +447,10 @@ function App() {
   useEffect(() => {
     writeAnsweredIds(answeredIds)
   }, [answeredIds])
+
+  useEffect(() => {
+    writeQuizResponses(quizResponses)
+  }, [quizResponses])
 
   useEffect(() => {
     if (mainView !== 'upload') setUploadPickerOpen(false)
@@ -471,6 +509,13 @@ function App() {
 
   const markAnswered = (postId: number) => {
     setAnsweredIds((current) => (current.includes(postId) ? current : [...current, postId]))
+  }
+
+  const saveQuizResponse = (postId: number, response: string) => {
+    setQuizResponses((current) => (
+      current[postId] === response ? current : { ...current, [postId]: response }
+    ))
+    markAnswered(postId)
   }
 
   const selectedGenerateSample = useMemo(
@@ -1111,6 +1156,8 @@ function App() {
                   onCheck={recordCheck}
                   onComplete={() => markComplete(item.post.id)}
                   onQuizAnswered={() => markAnswered(item.post.id)}
+                  savedQuizAnswer={quizResponses[item.post.id] ?? null}
+                  onSaveQuizAnswer={(response) => saveQuizResponse(item.post.id, response)}
                   onNext={() => scrollFeed(1)}
                   hasNext={index < visibleFeedItems.length - 1}
                   saved={savedIds.includes(item.post.id)}
@@ -1555,6 +1602,8 @@ function PostCard({
   onCheck,
   onComplete,
   onQuizAnswered,
+  savedQuizAnswer,
+  onSaveQuizAnswer,
   onNext,
   hasNext,
   saved,
@@ -1570,6 +1619,8 @@ function PostCard({
   onCheck: (topic: string, correct: boolean) => void
   onComplete: () => void
   onQuizAnswered: () => void
+  savedQuizAnswer: string | null
+  onSaveQuizAnswer: (response: string) => void
   onNext: () => void
   hasNext: boolean
   saved: boolean
@@ -1578,9 +1629,12 @@ function PostCard({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const scrubbingRef = useRef(false)
-  const [answer, setAnswer] = useState('')
-  const [submitted, setSubmitted] = useState(false)
-  const [completed, setCompleted] = useState(false)
+  const quiz = post.quiz
+  const [answer, setAnswer] = useState(() => savedQuizAnswer ?? '')
+  const [submitted, setSubmitted] = useState(() => Boolean(savedQuizAnswer))
+  const [completed, setCompleted] = useState(() => (
+    Boolean(savedQuizAnswer && quiz && savedQuizAnswer.trim().toLowerCase() === quiz.answer.toLowerCase())
+  ))
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState(commentSeeds)
   const [playing, setPlaying] = useState(false)
@@ -1595,7 +1649,7 @@ function PostCard({
   const [creditOpen, setCreditOpen] = useState(false)
   const [classOpen, setClassOpen] = useState(false)
   const [autoNextArmed, setAutoNextArmed] = useState(false)
-  const recordedRef = useRef(false)
+  const recordedRef = useRef(Boolean(savedQuizAnswer))
   const activeRef = useRef(active)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
@@ -1603,7 +1657,6 @@ function PostCard({
 
   const shareUrl = `${typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''}#lesson-${post.id}`
 
-  const quiz = post.quiz
   const correct = quiz
     ? answer.trim().toLowerCase() === quiz.answer.toLowerCase()
     : false
@@ -1612,7 +1665,6 @@ function PostCard({
   const ClassIcon = classMeta?.Icon ?? BookOpen
 
   const hideControlsAfterDelay = () => {
-    if (!touchControls) return
     window.clearTimeout(controlsTimerRef.current)
     setControlsVisible(true)
     controlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2500)
@@ -1628,7 +1680,9 @@ function PostCard({
     if (!playing) {
       window.clearTimeout(controlsTimerRef.current)
       setControlsVisible(true)
+      return
     }
+    hideControlsAfterDelay()
   }, [playing])
 
   useEffect(() => {
@@ -1766,7 +1820,7 @@ function PostCard({
     const video = videoRef.current
     if (!video) return
 
-    if (touchControls && playing && !controlsVisible) {
+    if (playing && !controlsVisible) {
       showControls()
       return
     }
@@ -1778,7 +1832,7 @@ function PostCard({
 
     if (!soundOnRef.current) {
       unlockSound()
-      if (touchControls) showControls()
+      showControls()
       return
     }
 
@@ -1817,8 +1871,10 @@ function PostCard({
 
   const submitQuiz = () => {
     if (!quiz) return
-    const isCorrect = answer.trim().toLowerCase() === quiz.answer.toLowerCase()
+    const response = answer.trim()
+    const isCorrect = response.toLowerCase() === quiz.answer.toLowerCase()
     setSubmitted(true)
+    onSaveQuizAnswer(response)
     markResult(isCorrect)
     if (isCorrect) setCompleted(true)
   }
@@ -1828,6 +1884,7 @@ function PostCard({
     const isCorrect = option === quiz.answer
     setAnswer(option)
     setSubmitted(true)
+    onSaveQuizAnswer(option)
     markResult(isCorrect)
     if (isCorrect) setCompleted(true)
   }
