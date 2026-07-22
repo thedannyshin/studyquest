@@ -703,14 +703,10 @@ function App() {
       | { type: 'post'; post: Post }
       | { type: 'complete' }
     > = []
-    const dueAfter = Math.min(2, visiblePosts.length)
-    const head = visiblePosts.slice(0, dueAfter)
-    const tail = visiblePosts.slice(dueAfter)
 
-    head.forEach((post) => items.push({ type: 'post', post }))
-    if (visibleDues.length > 0) items.push({ type: 'due', items: visibleDues })
+    visiblePosts.forEach((post) => items.push({ type: 'post', post }))
+    if (allPostsComplete && visibleDues.length > 0) items.push({ type: 'due', items: visibleDues })
     if (showAssignmentCard) items.push({ type: 'assignment' })
-    tail.forEach((post) => items.push({ type: 'post', post }))
     if (allPostsComplete) items.push({ type: 'complete' })
     return items
   }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete])
