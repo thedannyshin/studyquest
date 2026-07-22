@@ -58,23 +58,41 @@ type Post = {
 type UploadPrivacy = 'classmates' | 'only-me'
 type UploadMode = 'video' | 'generate'
 
-const MATERIAL_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'key', 'txt', 'pages', 'odt', 'odp']
-const MATERIAL_ACCEPT =
-  '.pdf,.doc,.docx,.ppt,.pptx,.key,.txt,.pages,.odt,.odp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain'
-const GENERATED_VIDEO_PLACEHOLDER = '/biology-water.mp4'
-
-function isMaterialFile(file: File) {
-  const extension = file.name.split('.').pop()?.toLowerCase()
-  if (extension && MATERIAL_EXTENSIONS.includes(extension)) return true
-  const type = file.type.toLowerCase()
-  return (
-    type.includes('pdf') ||
-    type.includes('document') ||
-    type.includes('presentation') ||
-    type.includes('msword') ||
-    type === 'text/plain'
-  )
+type GenerateSample = {
+  id: string
+  title: string
+  materialLabel: string
+  materialType: string
+  classCode: string
+  video: string
 }
+
+const generateSamples: GenerateSample[] = [
+  {
+    id: 'bio-cell-notes',
+    title: 'Cell structure overview',
+    materialLabel: 'Cell structure slides',
+    materialType: 'PDF',
+    classCode: 'BIO 102',
+    video: '/biology-water.mp4',
+  },
+  {
+    id: 'chem-bonding-notes',
+    title: 'Ionic vs covalent bonds',
+    materialLabel: 'Bonding lecture notes',
+    materialType: 'Slides',
+    classCode: 'CHEM 101',
+    video: '/chemistry-bonds.mp4',
+  },
+  {
+    id: 'hist-silk-road-notes',
+    title: 'The Silk Road in 60 seconds',
+    materialLabel: 'Trade networks packet',
+    materialType: 'PDF',
+    classCode: 'HIST 204',
+    video: '/biology-water.mp4',
+  },
+]
 
 const classes = ['BIO 102', 'CHEM 101', 'HIST 204']
 
@@ -347,16 +365,15 @@ function App() {
   const [uploadMode, setUploadMode] = useState<UploadMode>('video')
   const [uploadFileName, setUploadFileName] = useState('')
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
-  const [uploadMaterialName, setUploadMaterialName] = useState('')
+  const [uploadSampleId, setUploadSampleId] = useState<string | null>(null)
+  const [uploadPickerOpen, setUploadPickerOpen] = useState(false)
   const [uploadDragging, setUploadDragging] = useState(false)
-  const [uploadMaterialDragging, setUploadMaterialDragging] = useState(false)
   const [uploadGenerating, setUploadGenerating] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showAllDues, setShowAllDues] = useState(false)
   const feedRef = useRef<HTMLElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
-  const uploadMaterialInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (screen === 'feed') writeSession(true, provider)
@@ -369,6 +386,10 @@ function App() {
   useEffect(() => {
     writeCompletedIds(completedIds)
   }, [completedIds])
+
+  useEffect(() => {
+    if (mainView !== 'upload') setUploadPickerOpen(false)
+  }, [mainView])
 
   const sourceUrl = providerUrls[provider ?? 'Google Classroom']
   const providerLabel = provider ?? 'Google Classroom'
@@ -421,6 +442,11 @@ function App() {
     setCompletedIds((current) => (current.includes(postId) ? current : [...current, postId]))
   }
 
+  const selectedGenerateSample = useMemo(
+    () => generateSamples.find((sample) => sample.id === uploadSampleId) ?? null,
+    [uploadSampleId],
+  )
+
   const applyUploadFile = (file: File | undefined) => {
     if (!file || !file.type.startsWith('video/')) {
       setUploadError('Choose an MP4, WebM, or MOV video.')
@@ -455,25 +481,20 @@ function App() {
     probe.src = objectUrl
   }
 
-  const applyUploadMaterial = (file: File | undefined) => {
-    if (!file) return
-    if (!isMaterialFile(file)) {
-      setUploadError('Use a PDF, slides, or document file.')
-      setUploadMaterialName('')
-      if (uploadMaterialInputRef.current) uploadMaterialInputRef.current.value = ''
-      return
-    }
+  const selectGenerateSample = (sample: GenerateSample) => {
     setUploadError('')
-    setUploadMaterialName(file.name)
+    setUploadSampleId(sample.id)
+    setUploadClass(sample.classCode)
+    setUploadPickerOpen(false)
   }
 
   const switchUploadMode = (mode: UploadMode) => {
     if (mode === uploadMode) return
     setUploadMode(mode)
     setUploadError('')
+    setUploadPickerOpen(false)
     if (mode === 'video') {
-      setUploadMaterialName('')
-      if (uploadMaterialInputRef.current) uploadMaterialInputRef.current.value = ''
+      setUploadSampleId(null)
     } else {
       if (uploadPreview) URL.revokeObjectURL(uploadPreview)
       setUploadPreview(null)
@@ -486,13 +507,13 @@ function App() {
     if (uploadPreview) URL.revokeObjectURL(uploadPreview)
     setUploadPreview(null)
     setUploadFileName('')
-    setUploadMaterialName('')
+    setUploadSampleId(null)
+    setUploadPickerOpen(false)
     setUploadClass(classes[0])
     setUploadPrivacy('classmates')
     setUploadError('')
     setUploadGenerating(false)
     if (uploadInputRef.current) uploadInputRef.current.value = ''
-    if (uploadMaterialInputRef.current) uploadMaterialInputRef.current.value = ''
   }
 
   const toggleSaved = (postId: number) => {
@@ -533,7 +554,7 @@ function App() {
   const uploadReady =
     uploadMode === 'video'
       ? Boolean(uploadPreview && !uploadError && uploadClass && uploadPrivacy)
-      : Boolean(uploadMaterialName && !uploadError && uploadClass && uploadPrivacy && !uploadGenerating)
+      : Boolean(uploadSampleId && !uploadError && uploadClass && uploadPrivacy && !uploadGenerating)
 
   const submitUpload = (event: FormEvent) => {
     event.preventDefault()
@@ -544,19 +565,20 @@ function App() {
     const privacy = uploadPrivacy
 
     if (uploadMode === 'generate') {
-      const materialName = uploadMaterialName
-      const title = materialName.replace(/\.[^.]+$/, '') || 'Generated study video'
+      const sample = selectedGenerateSample
+      if (!sample) return
+      const materialName = `${sample.materialLabel} (${sample.materialType})`
       setUploadGenerating(true)
       window.setTimeout(() => {
         setUserPosts((current) => [
           {
             id: nextId,
             classCode,
-            title,
+            title: sample.title,
             modality: 'video',
             topic: 'uploaded',
             sourceLabel: materialName,
-            video: GENERATED_VIDEO_PLACEHOLDER,
+            video: sample.video,
             privacy,
             postedBy: 'Study Quest AI',
             generatedFrom: materialName,
@@ -566,7 +588,7 @@ function App() {
         resetUploadForm()
         setSelectedClass(classCode)
         setMainView('feed')
-      }, 2400)
+      }, 1200)
       return
     }
 
@@ -734,7 +756,7 @@ function App() {
     return (
       <main className="auth-page">
         <div className="auth-card">
-          <div className="wordmark">Study Quest</div>
+          <div className="wordmark">Study <span className="wordmark-accent">Quest</span></div>
           <h1>{authMode === 'signup' ? 'Sign up' : 'Log in'}</h1>
 
           <form onSubmit={submitAuth}>
@@ -851,7 +873,7 @@ function App() {
       <aside id="app-sidebar" className={`app-sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="Study Quest">
         <div className="sidebar-top">
           <div className="sidebar-brand">
-            <div className="wordmark">Study Quest</div>
+            <div className="wordmark">Study <span className="wordmark-accent">Quest</span></div>
             <button
               type="button"
               className="sidebar-close"
@@ -1194,6 +1216,14 @@ function App() {
             ))}
           </div>
           <form className="upload-form" onSubmit={submitUpload}>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime,video/*"
+              className="upload-file-input"
+              aria-label="Choose video"
+              onChange={(event) => applyUploadFile(event.target.files?.[0])}
+            />
             {uploadMode === 'video' ? (
               <div
                 className={`upload-drop ${uploadPreview ? 'has-preview' : ''} ${uploadDragging ? 'dragging' : ''}`}
@@ -1209,15 +1239,6 @@ function App() {
                   applyUploadFile(event.dataTransfer.files?.[0])
                 }}
               >
-                {!uploadPreview && (
-                  <input
-                    ref={uploadInputRef}
-                    type="file"
-                    accept="video/mp4,video/webm,video/quicktime,video/*"
-                    aria-label="Choose video"
-                    onChange={(event) => applyUploadFile(event.target.files?.[0])}
-                  />
-                )}
                 {uploadPreview ? (
                   <>
                     <video src={uploadPreview} controls playsInline />
@@ -1228,82 +1249,60 @@ function App() {
                     >
                       Change video
                     </button>
-                    <input
-                      ref={uploadInputRef}
-                      type="file"
-                      accept="video/mp4,video/webm,video/quicktime,video/*"
-                      className="upload-replace-input"
-                      aria-label="Change video"
-                      onChange={(event) => applyUploadFile(event.target.files?.[0])}
-                    />
                   </>
                 ) : (
-                  <div className="upload-pick">
-                    <Video size={28} strokeWidth={2} />
-                    <strong>Drop a 1 min or less video</strong>
-                    <span>MP4, WebM, or MOV</span>
-                  </div>
+                  <button
+                    type="button"
+                    className="upload-drop-trigger"
+                    onClick={() => uploadInputRef.current?.click()}
+                  >
+                    <span className="upload-pick">
+                      <Video size={28} strokeWidth={2} />
+                      <strong>Choose a 1 min or less video</strong>
+                      <span>MP4, WebM, or MOV</span>
+                    </span>
+                  </button>
                 )}
               </div>
             ) : (
               <div
-                className={`upload-drop upload-drop-material ${uploadMaterialName ? 'has-file' : ''} ${uploadMaterialDragging ? 'dragging' : ''} ${uploadGenerating ? 'generating' : ''}`}
-                onDragEnter={(event) => {
-                  event.preventDefault()
-                  if (!uploadGenerating) setUploadMaterialDragging(true)
-                }}
-                onDragOver={(event) => event.preventDefault()}
-                onDragLeave={() => setUploadMaterialDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault()
-                  setUploadMaterialDragging(false)
-                  if (!uploadGenerating) applyUploadMaterial(event.dataTransfer.files?.[0])
-                }}
+                className={`upload-drop upload-drop-material ${selectedGenerateSample ? 'has-file' : ''} ${uploadGenerating ? 'generating' : ''}`}
               >
-                {!uploadMaterialName && !uploadGenerating && (
-                  <input
-                    ref={uploadMaterialInputRef}
-                    type="file"
-                    accept={MATERIAL_ACCEPT}
-                    aria-label="Choose study materials"
-                    onChange={(event) => applyUploadMaterial(event.target.files?.[0])}
-                  />
-                )}
                 {uploadGenerating ? (
                   <div className="upload-pick">
                     <span className="upload-generating-spinner" aria-hidden="true" />
                     <strong>Generating your video…</strong>
                     <span>Study Quest AI is turning your file into a short clip.</span>
                   </div>
-                ) : uploadMaterialName ? (
+                ) : selectedGenerateSample ? (
                   <>
                     <div className="upload-pick upload-file-picked">
                       <FileText size={32} strokeWidth={2} />
-                      <strong>{uploadMaterialName}</strong>
-                      <span>Ready to generate</span>
+                      <strong>{selectedGenerateSample.materialLabel}</strong>
+                      <span>
+                        {selectedGenerateSample.materialType} · {selectedGenerateSample.classCode}
+                      </span>
                     </div>
                     <button
                       type="button"
                       className="upload-replace"
-                      onClick={() => uploadMaterialInputRef.current?.click()}
+                      onClick={() => setUploadPickerOpen(true)}
                     >
                       Change file
                     </button>
-                    <input
-                      ref={uploadMaterialInputRef}
-                      type="file"
-                      accept={MATERIAL_ACCEPT}
-                      className="upload-replace-input"
-                      aria-label="Change study materials"
-                      onChange={(event) => applyUploadMaterial(event.target.files?.[0])}
-                    />
                   </>
                 ) : (
-                  <div className="upload-pick">
-                    <FileText size={28} strokeWidth={2} />
-                    <strong>Drop slides, PDFs, or notes</strong>
-                    <span>Study Quest AI turns them into a short video</span>
-                  </div>
+                  <button
+                    type="button"
+                    className="upload-drop-trigger"
+                    onClick={() => setUploadPickerOpen(true)}
+                  >
+                    <span className="upload-pick">
+                      <FileText size={28} strokeWidth={2} />
+                      <strong>Choose slides, PDFs, or notes</strong>
+                      <span>Study Quest AI turns them into a short video</span>
+                    </span>
+                  </button>
                 )}
               </div>
             )}
@@ -1447,6 +1446,49 @@ function App() {
             </button>
           </div>
         </section>
+      )}
+
+      {uploadPickerOpen && createPortal(
+        <div
+          className="upload-picker-backdrop"
+          onClick={() => setUploadPickerOpen(false)}
+        >
+          <div
+            className="upload-picker-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose materials"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <strong>Choose materials</strong>
+              <button type="button" aria-label="Close" onClick={() => setUploadPickerOpen(false)}>
+                <X size={18} strokeWidth={2.2} />
+              </button>
+            </header>
+            <p>Pick what you want Study Quest AI to turn into a video.</p>
+            <ul className="upload-picker-list">
+              {generateSamples.map((sample) => (
+                <li key={sample.id}>
+                  <button
+                    type="button"
+                    className={uploadSampleId === sample.id ? 'active' : ''}
+                    onClick={() => selectGenerateSample(sample)}
+                  >
+                    <span className="upload-picker-icon" aria-hidden="true">
+                      <FileText size={20} strokeWidth={2} />
+                    </span>
+                    <span className="upload-picker-copy">
+                      <strong>{sample.materialLabel}</strong>
+                      <span>{sample.materialType} · {sample.classCode}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>,
+        document.body,
       )}
     </main>
   )
