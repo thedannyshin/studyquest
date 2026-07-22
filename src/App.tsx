@@ -594,6 +594,10 @@ function App() {
     return savedPosts.filter((post) => post.modality === savedFilter)
   }, [savedPosts, savedFilter])
 
+  const classesWithPosts = useMemo(() => {
+    return new Set(allPosts.map((post) => post.classCode))
+  }, [allPosts])
+
   const classProgress = useMemo(() => {
     return classFilters.map(({ id, label, Icon }) => {
       const classPosts = allPosts.filter((post) => post.classCode === id)
@@ -604,7 +608,7 @@ function App() {
       const total = videos.length + quizzes.length
       const done = videosDone + quizzesDone
       let status = 'Not started'
-      if (total === 0) status = 'Nothing here yet'
+      if (total === 0) status = 'Coming soon'
       else if (done === total) status = 'All done'
       else if (done > 0) status = `${done} of ${total} done`
       return {
@@ -734,6 +738,7 @@ function App() {
   }
 
   const openFeedClass = (classCode: string) => {
+    if (classCode !== 'All' && !classesWithPosts.has(classCode)) return
     setSelectedClass(classCode)
     setMainView('feed')
     setCommentsOpen(false)
@@ -933,6 +938,13 @@ function App() {
     }
     return feedItems
   }, [feedItems, answeredIds])
+
+  useEffect(() => {
+    if (selectedClass !== 'All' && !classesWithPosts.has(selectedClass)) {
+      setSelectedClass('All')
+      localStorage.setItem(LAST_FEED_CLASS_KEY, 'All')
+    }
+  }, [selectedClass, classesWithPosts])
 
   useEffect(() => {
     restoreFeedRef.current = true
@@ -1160,17 +1172,22 @@ function App() {
               </button>
 
               <div className="nav-sub" role="group" aria-label="Classes">
-                {classFilters.map(({ id, label, Icon }) => (
-                  <button
-                    type="button"
-                    className={mainView === 'feed' && selectedClass === id ? 'active' : ''}
-                    key={id}
-                    onClick={() => openFeedClass(id)}
-                  >
-                    <Icon size={18} strokeWidth={mainView === 'feed' && selectedClass === id ? 2.4 : 2} />
-                    <span>{label}</span>
-                  </button>
-                ))}
+                {classFilters.map(({ id, label, Icon }) => {
+                  const enabled = classesWithPosts.has(id)
+                  return (
+                    <button
+                      type="button"
+                      className={mainView === 'feed' && selectedClass === id ? 'active' : ''}
+                      key={id}
+                      disabled={!enabled}
+                      aria-disabled={!enabled}
+                      onClick={() => openFeedClass(id)}
+                    >
+                      <Icon size={18} strokeWidth={mainView === 'feed' && selectedClass === id ? 2.4 : 2} />
+                      <span>{label}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -1651,9 +1668,16 @@ function App() {
               <span style={{ width: `${overallProgress.percent}%` }} />
             </div>
             <ul className="progress-class-list">
-              {classProgress.map((item) => (
+              {classProgress.map((item) => {
+                const enabled = item.total > 0
+                return (
                 <li key={item.id}>
-                  <button type="button" onClick={() => openFeedClass(item.id)}>
+                  <button
+                    type="button"
+                    disabled={!enabled}
+                    aria-disabled={!enabled}
+                    onClick={() => openFeedClass(item.id)}
+                  >
                     <span className="progress-class-top">
                       <span className="progress-class-name">
                         <span className="class-avatar class-avatar-sm" aria-hidden="true">
@@ -1670,7 +1694,8 @@ function App() {
                     </span>
                   </button>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           </div>
 

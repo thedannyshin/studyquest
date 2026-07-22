@@ -287,6 +287,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 .nav-sub > button:hover {
   background: #1a1a1a;
 }
+.nav-sub > button:disabled {
+  color: #555;
+  cursor: default;
+  opacity: 0.55;
+}
+.nav-sub > button:disabled:hover {
+  background: transparent;
+}
 .mobile-tabbar,
 .mobile-menu-btn,
 .mobile-nav-backdrop,
@@ -767,6 +775,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 .progress-class-list button:hover {
   background: #1c1c1c;
   border-color: #333;
+}
+.progress-class-list button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.progress-class-list button:disabled:hover {
+  background: #161616;
+  border-color: #2a2a2a;
 }
 .progress-class-top {
   display: flex;
