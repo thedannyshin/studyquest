@@ -377,12 +377,8 @@ function App() {
   const [uploadError, setUploadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showAllDues, setShowAllDues] = useState(false)
-  const [blockedHintPostId, setBlockedHintPostId] = useState<number | null>(null)
   const feedRef = useRef<HTMLElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
-  const activeIndexRef = useRef(0)
-  const blockedHintTimerRef = useRef<number>()
-  const blockedHintPostIdRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (screen === 'feed') writeSession(true, provider)
@@ -719,65 +715,15 @@ function App() {
     return items
   }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete])
 
-  const feedItemsRef = useRef(feedItems)
-  const completedIdsRef = useRef(completedIds)
-  feedItemsRef.current = feedItems
-  completedIdsRef.current = completedIds
-  activeIndexRef.current = activeIndex
-
-  const canAdvanceFromIndex = (index: number) => {
-    const item = feedItemsRef.current[index]
-    if (!item || item.type !== 'post' || item.post.modality !== 'drill') return true
-    return completedIdsRef.current.includes(item.post.id)
-  }
-
-  const showAdvanceBlockedHint = (index: number) => {
-    const item = feedItemsRef.current[index]
-    if (item?.type !== 'post' || item.post.modality !== 'drill') return
-    if (blockedHintPostIdRef.current === item.post.id) return
-    blockedHintPostIdRef.current = item.post.id
-    setBlockedHintPostId(item.post.id)
-    window.clearTimeout(blockedHintTimerRef.current)
-    blockedHintTimerRef.current = window.setTimeout(() => {
-      blockedHintPostIdRef.current = null
-      setBlockedHintPostId(null)
-    }, 3000)
-  }
-
-  useEffect(() => {
-    if (blockedHintPostId && completedIds.includes(blockedHintPostId)) {
-      blockedHintPostIdRef.current = null
-      setBlockedHintPostId(null)
+  const visibleFeedItems = useMemo(() => {
+    for (let i = 0; i < feedItems.length; i++) {
+      const item = feedItems[i]
+      if (item.type === 'post' && item.post.modality === 'drill' && !completedIds.includes(item.post.id)) {
+        return feedItems.slice(0, i + 1)
+      }
     }
-  }, [completedIds, blockedHintPostId])
-
-  useEffect(() => {
-    if (screen !== 'feed') return
-    const root = feedRef.current
-    if (!root) return
-
-    let clamping = false
-    const clampForwardScroll = () => {
-      if (clamping) return
-
-      const slideHeight = root.clientHeight
-      if (slideHeight <= 0) return
-
-      const current = activeIndexRef.current
-      if (canAdvanceFromIndex(current)) return
-
-      const maxTop = current * slideHeight
-      if (root.scrollTop <= maxTop + 1) return
-
-      clamping = true
-      root.scrollTop = maxTop
-      clamping = false
-      showAdvanceBlockedHint(current)
-    }
-
-    root.addEventListener('scroll', clampForwardScroll, { passive: true })
-    return () => root.removeEventListener('scroll', clampForwardScroll)
-  }, [screen, feedItems.length, completedIds])
+    return feedItems
+  }, [feedItems, completedIds])
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: 0 })
@@ -805,26 +751,17 @@ function App() {
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
         if (!visible) return
         const index = slides.indexOf(visible.target as HTMLElement)
-        if (index < 0) return
-
-        const current = activeIndexRef.current
-        if (index > current && !canAdvanceFromIndex(current)) return
-
-        setActiveIndex(index)
+        if (index >= 0) setActiveIndex(index)
       },
       { root, threshold: [0.55, 0.75] },
     )
 
     slides.forEach((slide) => observer.observe(slide))
     return () => observer.disconnect()
-  }, [feedItems.length, selectedClass, screen, completedIds])
+  }, [visibleFeedItems.length, selectedClass, screen])
 
   const scrollFeed = (direction: -1 | 1) => {
-    if (direction === 1 && !canAdvanceFromIndex(activeIndex)) {
-      showAdvanceBlockedHint(activeIndex)
-      return
-    }
-    const next = Math.min(Math.max(activeIndex + direction, 0), Math.max(feedItems.length - 1, 0))
+    const next = Math.min(Math.max(activeIndex + direction, 0), Math.max(visibleFeedItems.length - 1, 0))
     const slides = feedRef.current?.querySelectorAll<HTMLElement>('.feed-slide')
     slides?.[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     setActiveIndex(next)
@@ -1021,7 +958,7 @@ function App() {
       {mainView === 'feed' ? (
       <div className="feed-layout">
         <section className="feed-scroll" ref={feedRef} aria-label="Study feed">
-          {feedItems.map((item, index) => (
+          {visibleFeedItems.map((item, index) => (
             <div
               className="feed-slide"
               key={
@@ -1146,16 +1083,20 @@ function App() {
                   onCheck={recordCheck}
                   onComplete={() => markComplete(item.post.id)}
                   onNext={() => scrollFeed(1)}
-                  hasNext={index < feedItems.length - 1}
+                  hasNext={index < visibleFeedItems.length - 1}
                   saved={savedIds.includes(item.post.id)}
                   onToggleSave={() => toggleSaved(item.post.id)}
-                  showAdvanceHint={blockedHintPostId === item.post.id}
+                  showContinueHint={
+                    item.post.modality === 'drill'
+                    && !completedIds.includes(item.post.id)
+                    && index === visibleFeedItems.length - 1
+                  }
                 />
               )}
             </div>
           ))}
 
-          {feedItems.length === 0 && (
+          {visibleFeedItems.length === 0 && (
             <div className="feed-slide">
               <div className="tiktok-row">
                 <article className="post-frame assignment">
@@ -1169,7 +1110,7 @@ function App() {
           )}
         </section>
 
-        {feedItems.length > 1 && (
+        {visibleFeedItems.length > 1 && (
           <div className="feed-arrows">
             <button
               type="button"
@@ -1182,7 +1123,7 @@ function App() {
             <button
               type="button"
               aria-label="Next post"
-              disabled={activeIndex >= feedItems.length - 1}
+              disabled={activeIndex >= visibleFeedItems.length - 1}
               onClick={() => scrollFeed(1)}
             >
               <ChevronDown size={20} />
@@ -1588,7 +1529,7 @@ function PostCard({
   hasNext,
   saved,
   onToggleSave,
-  showAdvanceHint,
+  showContinueHint,
 }: {
   post: Post
   sourceUrl: string
@@ -1602,7 +1543,7 @@ function PostCard({
   hasNext: boolean
   saved: boolean
   onToggleSave: () => void
-  showAdvanceHint: boolean
+  showContinueHint: boolean
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const scrubbingRef = useRef(false)
@@ -2099,9 +2040,9 @@ function PostCard({
             </button>
           </aside>
 
-          {showAdvanceHint && post.modality === 'drill' && (
+          {showContinueHint && (
             <p className="post-advance-hint" role="status">
-              Answer this quiz before moving on.
+              Answer this quiz to continue.
             </p>
           )}
         </article>
