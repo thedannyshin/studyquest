@@ -1596,8 +1596,10 @@ function PostCard({
   const [classOpen, setClassOpen] = useState(false)
   const [autoNextArmed, setAutoNextArmed] = useState(false)
   const recordedRef = useRef(false)
+  const activeRef = useRef(active)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
+  activeRef.current = active
 
   const shareUrl = `${typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''}#lesson-${post.id}`
 
@@ -1676,6 +1678,12 @@ function PostCard({
     const video = videoRef.current
     if (!video) return
 
+    if (!active) {
+      video.pause()
+      video.muted = true
+      return
+    }
+
     const onPlay = () => {
       setPlaying(true)
       hideControlsAfterDelay()
@@ -1701,23 +1709,39 @@ function PostCard({
     video.setAttribute('playsinline', '')
     video.setAttribute('webkit-playsinline', '')
 
-    if (active) {
+    if (touchControls) {
       video.muted = !soundOnRef.current
-      void video.play().then(() => {
-        if (!video.paused) hideControlsAfterDelay()
-      }).catch(() => {})
     } else {
-      video.pause()
-      video.muted = true
+      primeVideoForSound(video)
+      soundOnRef.current = true
+      setSoundOn(true)
     }
+    void video.play().then(() => {
+      if (!activeRef.current) {
+        video.pause()
+        video.muted = true
+        return
+      }
+      if (!video.paused) hideControlsAfterDelay()
+    }).catch(() => {})
 
     return () => {
+      video.pause()
+      video.muted = true
       video.removeEventListener('play', onPlay)
       video.removeEventListener('pause', onPause)
       video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('loadedmetadata', onLoaded)
     }
-  }, [active, post.modality, post.video, completed])
+  }, [active, post.modality, post.video, completed, touchControls])
+
+  useEffect(() => {
+    if (post.modality !== 'video' || active) return
+    const video = videoRef.current
+    if (!video) return
+    video.pause()
+    video.muted = true
+  }, [active, post.modality])
 
   const unlockSound = () => {
     const video = videoRef.current
