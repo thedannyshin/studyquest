@@ -275,8 +275,16 @@ const SAVED_KEY = 'study-quest-saved'
 const PROGRESS_KEY = 'study-quest-progress'
 const ANSWERED_KEY = 'study-quest-answered'
 const QUIZ_RESPONSES_KEY = 'study-quest-quiz-responses'
+const FEED_POSITION_KEY = 'study-quest-feed-position'
+const LAST_FEED_CLASS_KEY = 'study-quest-feed-class'
 
 type QuizResponses = Record<number, string>
+type FeedPositions = Record<string, string>
+type FeedItem =
+  | { type: 'due'; items: (typeof upcomingItems)[number][] }
+  | { type: 'assignment' }
+  | { type: 'post'; post: Post }
+  | { type: 'complete' }
 const PROFILE_PHOTO = 'https://randomuser.me/api/portraits/women/68.jpg'
 const PROFILE_NAME = 'Alex Morgan'
 const PROFILE_EMAIL = 'alex@northbridge.edu'
@@ -395,6 +403,42 @@ function mergeAnsweredIds(ids: number[], responses: QuizResponses) {
   return [...new Set([...ids, ...fromResponses])]
 }
 
+function readFeedPositions(): FeedPositions {
+  try {
+    const raw = localStorage.getItem(FEED_POSITION_KEY)
+    if (!raw) return {}
+    const data = JSON.parse(raw) as unknown
+    if (!data || typeof data !== 'object') return {}
+    const positions: FeedPositions = {}
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      if (typeof value === 'string') positions[key] = value
+    }
+    return positions
+  } catch {
+    return {}
+  }
+}
+
+function writeFeedPositions(positions: FeedPositions) {
+  localStorage.setItem(FEED_POSITION_KEY, JSON.stringify(positions))
+}
+
+function readLastFeedClass() {
+  try {
+    return localStorage.getItem(LAST_FEED_CLASS_KEY) || 'All'
+  } catch {
+    return 'All'
+  }
+}
+
+function getFeedItemKey(item: FeedItem, index: number) {
+  if (item.type === 'post') return `post-${item.post.id}`
+  if (item.type === 'due') return 'due-board'
+  if (item.type === 'complete') return 'feed-complete'
+  if (item.type === 'assignment') return 'assignment'
+  return `slide-${index}`
+}
+
 function App() {
   const initialSession = useMemo(() => readSession(), [])
   const [screen, setScreen] = useState<Screen>(() => initialSession.screen)
@@ -402,7 +446,7 @@ function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('signup')
   const [provider, setProvider] = useState<Provider | null>(() => initialSession.provider)
   const [syncProgress, setSyncProgress] = useState(0)
-  const [selectedClass, setSelectedClass] = useState('All')
+  const [selectedClass, setSelectedClass] = useState(() => readLastFeedClass())
   const [topicStatus, setTopicStatus] = useState<Record<string, TopicStatus>>({})
   const [topicCorrectStreak, setTopicCorrectStreak] = useState<Record<string, number>>({})
   const [assignmentOpened, setAssignmentOpened] = useState(false)
@@ -429,7 +473,9 @@ function App() {
   const [uploadError, setUploadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showAllDues, setShowAllDues] = useState(false)
+  const [feedPositions, setFeedPositions] = useState<FeedPositions>(() => readFeedPositions())
   const feedRef = useRef<HTMLElement>(null)
+  const restoreFeedRef = useRef(true)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -451,6 +497,10 @@ function App() {
   useEffect(() => {
     writeQuizResponses(quizResponses)
   }, [quizResponses])
+
+  useEffect(() => {
+    writeFeedPositions(feedPositions)
+  }, [feedPositions])
 
   useEffect(() => {
     if (mainView !== 'upload') setUploadPickerOpen(false)
@@ -612,6 +662,7 @@ function App() {
     setMainView('feed')
     setCommentsOpen(false)
     setMobileNavOpen(false)
+    localStorage.setItem(LAST_FEED_CLASS_KEY, classCode)
   }
 
   const openMainView = (view: MainView) => {
@@ -770,12 +821,7 @@ function App() {
   }, [visiblePosts, answeredIds])
 
   const feedItems = useMemo(() => {
-    const items: Array<
-      | { type: 'due'; items: (typeof upcomingItems)[number][] }
-      | { type: 'assignment' }
-      | { type: 'post'; post: Post }
-      | { type: 'complete' }
-    > = []
+    const items: FeedItem[] = []
 
     visiblePosts.forEach((post) => items.push({ type: 'post', post }))
     if (allPostsComplete && visibleDues.length > 0) items.push({ type: 'due', items: visibleDues })
@@ -799,11 +845,51 @@ function App() {
   }, [feedItems, answeredIds])
 
   useEffect(() => {
-    feedRef.current?.scrollTo({ top: 0 })
-    setActiveIndex(0)
+    restoreFeedRef.current = true
     setCommentsOpen(false)
     setShowAllDues(false)
+    localStorage.setItem(LAST_FEED_CLASS_KEY, selectedClass)
   }, [selectedClass])
+
+  useEffect(() => {
+    if (screen !== 'feed' || mainView !== 'feed') return
+    restoreFeedRef.current = true
+  }, [mainView, screen])
+
+  useEffect(() => {
+    if (screen !== 'feed' || mainView !== 'feed' || !restoreFeedRef.current) return
+    if (visibleFeedItems.length === 0) return
+
+    const savedKey = feedPositions[selectedClass]
+    let targetIndex = 0
+    if (savedKey) {
+      const found = visibleFeedItems.findIndex((item, index) => (
+        getFeedItemKey(item, index) === savedKey
+      ))
+      if (found >= 0) targetIndex = found
+    }
+
+    targetIndex = Math.min(targetIndex, visibleFeedItems.length - 1)
+
+    const root = feedRef.current
+    requestAnimationFrame(() => {
+      const slides = root?.querySelectorAll<HTMLElement>('.feed-slide')
+      slides?.[targetIndex]?.scrollIntoView({ behavior: 'auto', block: 'start' })
+      setActiveIndex(targetIndex)
+      restoreFeedRef.current = false
+    })
+  }, [screen, mainView, selectedClass, visibleFeedItems.length, feedPositions])
+
+  useEffect(() => {
+    if (screen !== 'feed' || mainView !== 'feed' || restoreFeedRef.current) return
+    const item = visibleFeedItems[activeIndex]
+    if (!item) return
+    const key = getFeedItemKey(item, activeIndex)
+    setFeedPositions((current) => (
+      current[selectedClass] === key ? current : { ...current, [selectedClass]: key }
+    ))
+    localStorage.setItem(LAST_FEED_CLASS_KEY, selectedClass)
+  }, [activeIndex, selectedClass, screen, mainView, visibleFeedItems])
 
   useEffect(() => {
     setCommentsOpen(false)
