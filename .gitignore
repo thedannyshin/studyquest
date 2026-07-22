@@ -1,0 +1,14 @@
+node_modules
+dist
+.DS_Store
+*.tsbuildinfo
+.vercel
+.env
+.env.*
+!.env.example
+
+# Local source / scratch assets (not used by the app)
+International-A-Level-Biology-Student-Book-sample.pdf
+part1(split-video.com).mp4
+part2(split-video.com).mp4
+Group *.png
