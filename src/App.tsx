@@ -290,6 +290,22 @@ const PROFILE_NAME = 'Alex Morgan'
 const PROFILE_EMAIL = 'alex@northbridge.edu'
 const PROFILE_SCHOOL = 'Northbridge University'
 
+function formatPosterName(name: string) {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0]
+  return `${parts[0]} ${parts[parts.length - 1][0]}`
+}
+
+function getVideoAttribution(postedBy?: string) {
+  if (!postedBy || postedBy === 'StudyQuest AI') {
+    return 'StudyQuest AI generated this video'
+  }
+  if (postedBy === PROFILE_NAME) {
+    return 'You posted this video'
+  }
+  return `${formatPosterName(postedBy)} posted this video`
+}
+
 const providerUrls: Record<Provider, string> = {
   'Google Classroom': 'https://classroom.google.com',
   Canvas: 'https://canvas.instructure.com',
@@ -1744,12 +1760,24 @@ function PostCard({
 
   const shareUrl = `${typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''}#lesson-${post.id}`
 
-  const correct = quiz
-    ? answer.trim().toLowerCase() === quiz.answer.toLowerCase()
+  const displayAnswer = savedQuizAnswer ?? answer
+  const displaySubmitted = Boolean(savedQuizAnswer) || submitted
+  const displayCorrect = quiz
+    ? displayAnswer.trim().toLowerCase() === quiz.answer.toLowerCase()
     : false
   const title = post.modality === 'drill' && quiz ? quiz.question : post.title
   const classMeta = classFilters.find((item) => item.id === post.classCode)
   const ClassIcon = classMeta?.Icon ?? BookOpen
+
+  useEffect(() => {
+    if (!savedQuizAnswer) return
+    setAnswer(savedQuizAnswer)
+    setSubmitted(true)
+    recordedRef.current = true
+    if (quiz) {
+      setCompleted(savedQuizAnswer.trim().toLowerCase() === quiz.answer.toLowerCase())
+    }
+  }, [post.id, savedQuizAnswer, quiz?.answer])
 
   const hideControlsAfterDelay = () => {
     window.clearTimeout(controlsTimerRef.current)
@@ -1957,7 +1985,7 @@ function PostCard({
   }
 
   const submitQuiz = () => {
-    if (!quiz) return
+    if (!quiz || displaySubmitted) return
     const response = answer.trim()
     const isCorrect = response.toLowerCase() === quiz.answer.toLowerCase()
     setSubmitted(true)
@@ -1967,7 +1995,7 @@ function PostCard({
   }
 
   const chooseOption = (option: string) => {
-    if (submitted || !quiz) return
+    if (displaySubmitted || !quiz) return
     const isCorrect = option === quiz.answer
     setAnswer(option)
     setSubmitted(true)
@@ -2003,35 +2031,35 @@ function PostCard({
           <div className="quiz-options">
             {quiz.options?.map((option, index) => {
               const isCorrectOption = option === quiz.answer
-              const isChosen = answer === option
-              const isIrrelevant = submitted && !isCorrectOption && !isChosen
+              const isChosen = displayAnswer === option
+              const isIrrelevant = displaySubmitted && !isCorrectOption && !isChosen
               return (
                 <button
                   key={option}
-                  disabled={submitted}
+                  disabled={displaySubmitted}
                   className={[
                     isChosen ? 'selected' : '',
-                    submitted && isCorrectOption ? 'correct' : '',
-                    submitted && isChosen && !correct ? 'wrong' : '',
+                    displaySubmitted && isCorrectOption ? 'correct' : '',
+                    displaySubmitted && isChosen && !displayCorrect ? 'wrong' : '',
                     isIrrelevant ? 'dim' : '',
                   ].join(' ')}
                   onClick={() => chooseOption(option)}
                 >
                   <span>{String.fromCharCode(65 + index)}</span>{option}
-                  {submitted && isCorrectOption && <Check size={17} />}
-                  {submitted && isChosen && !correct && <X size={17} />}
+                  {displaySubmitted && isCorrectOption && <Check size={17} />}
+                  {displaySubmitted && isChosen && !displayCorrect && <X size={17} />}
                 </button>
               )
             })}
           </div>
         ) : (
           <>
-            <div className={`fill-field ${submitted ? (correct ? 'correct' : 'wrong') : ''}`}>
+            <div className={`fill-field ${displaySubmitted ? (displayCorrect ? 'correct' : 'wrong') : ''}`}>
               <input
                 className="fill-answer"
                 placeholder="Type your answer"
-                value={answer}
-                disabled={submitted}
+                value={displayAnswer}
+                disabled={displaySubmitted}
                 onChange={(event) => setAnswer(event.target.value)}
                 onFocus={() => {
                   if (touchControls) setQuizInputActive(true)
@@ -2041,7 +2069,7 @@ function PostCard({
                   if (event.key === 'Enter' && answer.trim()) submitQuiz()
                 }}
               />
-              {!submitted && (
+              {!displaySubmitted && (
                 <button
                   className="fill-send"
                   type="button"
@@ -2053,14 +2081,21 @@ function PostCard({
                 </button>
               )}
             </div>
-            {submitted && (
-              <div className={`quiz-result ${correct ? 'success' : 'retry'}`}>
+            {displaySubmitted && (
+              <div className={`quiz-result ${displayCorrect ? 'success' : 'retry'}`}>
                 <strong>
-                  {correct ? 'Correct' : `Incorrect, the answer is: ${quiz.answer}`}
+                  {displayCorrect ? 'Correct' : `Incorrect, the answer is: ${quiz.answer}`}
                 </strong>
               </div>
             )}
           </>
+        )}
+        {displaySubmitted && isMultiple && (
+          <div className={`quiz-result ${displayCorrect ? 'success' : 'retry'}`}>
+            <strong>
+              {displayCorrect ? 'Correct' : `Incorrect, the answer is: ${quiz.answer}`}
+            </strong>
+          </div>
         )}
       </div>
     )
@@ -2090,11 +2125,7 @@ function PostCard({
             {creditOpen && (
               <div className="post-credit-tip">
                 {post.modality === 'video' && (
-                  <p>
-                    {post.postedBy === 'StudyQuest AI'
-                      ? 'StudyQuest AI generated'
-                      : `${post.postedBy ?? PROFILE_NAME} posted`}
-                  </p>
+                  <p>{getVideoAttribution(post.postedBy)}</p>
                 )}
                 <p className="post-credit-meta">
                   Source:{' '}
