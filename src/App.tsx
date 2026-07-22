@@ -1509,12 +1509,18 @@ function PostCard({
                       : `${post.postedBy ?? PROFILE_NAME} posted`}
                   </p>
                 )}
-                {post.sourceLabel && post.sourceLabel !== 'Your upload' && (
-                  <p className="post-credit-meta">{post.sourceLabel}</p>
-                )}
-                <a href={sourceUrl} target="_blank" rel="noreferrer">
-                  Open in {sourceProvider}
-                </a>
+                <p className="post-credit-meta">
+                  Source:{' '}
+                  {!post.postedBy || post.postedBy === 'Study Quest AI' ? (
+                    <a href={sourceUrl} target="_blank" rel="noreferrer">
+                      {sourceProvider}
+                    </a>
+                  ) : post.postedBy === PROFILE_NAME ? (
+                    'Your upload'
+                  ) : (
+                    post.postedBy
+                  )}
+                </p>
               </div>
             )}
           </div>

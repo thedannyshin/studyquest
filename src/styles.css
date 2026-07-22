@@ -844,16 +844,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   position: absolute;
   top: 14px;
   right: 14px;
-  left: auto;
-  bottom: auto;
   z-index: 4;
-  display: flex;
-  flex-direction: row-reverse;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100% - 88px);
+  width: 32px;
+  height: 32px;
 }
 .post-credit-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
   width: 32px;
   height: 32px;
   border: 0;
@@ -867,6 +865,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   -webkit-tap-highlight-color: transparent;
 }
 .post-credit-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 28px));
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
@@ -878,18 +881,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: grid;
-  gap: 6px;
+  gap: 4px;
   text-align: left;
-  min-width: 0;
 }
 .post-credit-tip p {
   margin: 0;
 }
 .post-credit-meta {
   font-weight: 500;
-  color: #8a8a8a;
+  color: #b0b0b0;
 }
-.post-credit-tip a {
+.post-credit-meta a {
   color: #f2f2f2;
   font-weight: 700;
   text-decoration: underline;
@@ -1625,8 +1627,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   .post-credit {
     top: calc(12px + env(safe-area-inset-top));
     right: 12px;
-    left: auto;
-    bottom: auto;
   }
   .panel-view {
     flex: 1;
