@@ -1648,6 +1648,7 @@ function PostCard({
   const [shareCopied, setShareCopied] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
   const [classOpen, setClassOpen] = useState(false)
+  const [quizInputActive, setQuizInputActive] = useState(false)
   const [autoNextArmed, setAutoNextArmed] = useState(false)
   const recordedRef = useRef(Boolean(savedQuizAnswer))
   const activeRef = useRef(active)
@@ -1946,6 +1947,10 @@ function PostCard({
                 value={answer}
                 disabled={submitted}
                 onChange={(event) => setAnswer(event.target.value)}
+                onFocus={() => {
+                  if (touchControls) setQuizInputActive(true)
+                }}
+                onBlur={() => setQuizInputActive(false)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && answer.trim()) submitQuiz()
                 }}
@@ -2094,7 +2099,7 @@ function PostCard({
             </div>
           )}
 
-          <aside className="action-rail" aria-label="Post actions">
+          <aside className={`action-rail${quizInputActive ? ' is-hidden' : ''}`} aria-label="Post actions">
             <div className={`action-class ${classOpen ? 'open' : ''}`}>
               <button
                 type="button"
