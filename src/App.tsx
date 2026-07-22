@@ -986,7 +986,7 @@ function App() {
 
           {savedPosts.length === 0 ? (
             <div className="panel-empty">
-              <p>Bookmark posts in the feed to find them here.</p>
+              <p>Tap Save on any post to keep it here.</p>
               <button type="button" className="lesson-primary" onClick={() => openFeedClass('All')}>
                 Back to feed
               </button>
@@ -1285,6 +1285,18 @@ function PostCard({
       setAutoNextArmed(false)
     }
   }, [active])
+
+  useEffect(() => {
+    if (!creditOpen) return
+    const timer = window.setTimeout(() => setCreditOpen(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [creditOpen])
+
+  useEffect(() => {
+    if (!classOpen) return
+    const timer = window.setTimeout(() => setClassOpen(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [classOpen])
 
   useEffect(() => {
     if (!active || !completed || !autoNextArmed || post.modality !== 'video' || !hasNext) return
