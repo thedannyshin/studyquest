@@ -1532,8 +1532,9 @@ function PostCard({
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState(commentSeeds)
   const [playing, setPlaying] = useState(false)
-  const [muted, setMuted] = useState(true)
+  const [soundOn, setSoundOn] = useState(false)
   const [progress, setProgress] = useState(0)
+  const soundOnRef = useRef(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
@@ -1554,13 +1555,21 @@ function PostCard({
   const ClassIcon = classMeta?.Icon ?? BookOpen
 
   useEffect(() => {
+    soundOnRef.current = soundOn
+  }, [soundOn])
+
+  useEffect(() => {
     if (!active) {
       setCreditOpen(false)
       setClassOpen(false)
       setAutoNextArmed(false)
-      setMuted(true)
+      setSoundOn(false)
+      soundOnRef.current = false
       const video = videoRef.current
-      if (video) video.muted = true
+      if (video) {
+        video.pause()
+        video.muted = true
+      }
     }
   }, [active])
 
@@ -1605,45 +1614,51 @@ function PostCard({
     video.addEventListener('pause', onPause)
     video.addEventListener('timeupdate', onTimeUpdate)
     video.addEventListener('loadedmetadata', onLoaded)
+    video.setAttribute('playsinline', '')
+    video.setAttribute('webkit-playsinline', '')
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
-          video.play().catch(() => {})
-        } else {
-          video.pause()
-        }
-      },
-      { threshold: [0, 0.65, 1] },
-    )
+    if (active) {
+      video.muted = !soundOnRef.current
+      void video.play().catch(() => {})
+    } else {
+      video.muted = true
+    }
 
-    observer.observe(video)
     return () => {
       video.removeEventListener('play', onPlay)
       video.removeEventListener('pause', onPause)
       video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('loadedmetadata', onLoaded)
-      observer.disconnect()
     }
-  }, [post.modality, post.video, completed])
+  }, [active, post.modality, post.video, completed])
 
-  const enableSound = () => {
-    const video = videoRef.current
-    if (!video || !video.muted) return
-    video.muted = false
-    setMuted(false)
-  }
-
-  const togglePlayback = () => {
+  const unlockSound = () => {
     const video = videoRef.current
     if (!video) return
-    if (playing && muted) {
-      enableSound()
+
+    const time = video.currentTime
+    video.pause()
+    video.muted = false
+    video.removeAttribute('muted')
+    video.defaultMuted = false
+    video.volume = 1
+    video.currentTime = time
+    soundOnRef.current = true
+    setSoundOn(true)
+    void video.play().catch(() => {})
+  }
+
+  const handleVideoControl = () => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (video.muted || !soundOnRef.current) {
+      unlockSound()
       return
     }
+
     if (video.paused) {
-      enableSound()
-      video.play().catch(() => {})
+      void video.play().catch(() => {})
     } else {
       video.pause()
     }
@@ -1834,19 +1849,22 @@ function PostCard({
                 ref={videoRef}
                 src={post.video}
                 playsInline
-                muted={muted}
                 loop={false}
-                preload="metadata"
+                preload="auto"
                 onEnded={finishVideo}
-                onClick={togglePlayback}
+                onPointerDown={handleVideoControl}
               />
               <button
                 type="button"
-                className={`video-play-toggle ${playing ? 'playing' : ''}${playing && muted ? ' playing-muted' : ''}`}
-                onClick={togglePlayback}
-                aria-label={playing && muted ? 'Unmute' : playing ? 'Pause' : 'Play'}
+                className={`video-play-toggle ${playing ? 'playing' : ''}${playing && !soundOn ? ' playing-muted' : ''}`}
+                onPointerDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  handleVideoControl()
+                }}
+                aria-label={playing && !soundOn ? 'Unmute' : playing ? 'Pause' : 'Play'}
               >
-                {playing && muted ? (
+                {playing && !soundOn ? (
                   <VolumeX size={28} strokeWidth={2.2} />
                 ) : playing ? (
                   <Pause size={28} fill="currentColor" />
@@ -1864,7 +1882,7 @@ function PostCard({
                 tabIndex={0}
                 onPointerDown={(event) => {
                   scrubbingRef.current = true
-                  enableSound()
+                  if (!soundOnRef.current) unlockSound()
                   event.currentTarget.setPointerCapture(event.pointerId)
                   seekToRatio(ratioFromEvent(event))
                 }}
