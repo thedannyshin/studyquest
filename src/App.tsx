@@ -1,8 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  isSessionAudioUnlocked,
-  markSessionAudioUnlocked,
   primeVideoForSound,
   shouldDeferVideoAutoplay,
 } from './videoAudio'
@@ -379,8 +377,11 @@ function App() {
   const [uploadError, setUploadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showAllDues, setShowAllDues] = useState(false)
+  const [blockedHintPostId, setBlockedHintPostId] = useState<number | null>(null)
   const feedRef = useRef<HTMLElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  const activeIndexRef = useRef(0)
+  const blockedHintTimerRef = useRef<number>()
 
   useEffect(() => {
     if (screen === 'feed') writeSession(true, provider)
@@ -717,6 +718,32 @@ function App() {
     return items
   }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete])
 
+  const feedItemsRef = useRef(feedItems)
+  const completedIdsRef = useRef(completedIds)
+  feedItemsRef.current = feedItems
+  completedIdsRef.current = completedIds
+  activeIndexRef.current = activeIndex
+
+  const canAdvanceFromIndex = (index: number) => {
+    const item = feedItemsRef.current[index]
+    if (!item || item.type !== 'post' || item.post.modality !== 'drill') return true
+    return completedIdsRef.current.includes(item.post.id)
+  }
+
+  const showAdvanceBlockedHint = (index: number) => {
+    const item = feedItemsRef.current[index]
+    if (item?.type !== 'post' || item.post.modality !== 'drill') return
+    setBlockedHintPostId(item.post.id)
+    window.clearTimeout(blockedHintTimerRef.current)
+    blockedHintTimerRef.current = window.setTimeout(() => setBlockedHintPostId(null), 3000)
+  }
+
+  useEffect(() => {
+    if (blockedHintPostId && completedIds.includes(blockedHintPostId)) {
+      setBlockedHintPostId(null)
+    }
+  }, [completedIds, blockedHintPostId])
+
   useEffect(() => {
     feedRef.current?.scrollTo({ top: 0 })
     setActiveIndex(0)
@@ -743,16 +770,29 @@ function App() {
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
         if (!visible) return
         const index = slides.indexOf(visible.target as HTMLElement)
-        if (index >= 0) setActiveIndex(index)
+        if (index < 0) return
+
+        const current = activeIndexRef.current
+        if (index > current && !canAdvanceFromIndex(current)) {
+          slides[current]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          showAdvanceBlockedHint(current)
+          return
+        }
+
+        setActiveIndex(index)
       },
       { root, threshold: [0.55, 0.75] },
     )
 
     slides.forEach((slide) => observer.observe(slide))
     return () => observer.disconnect()
-  }, [feedItems.length, selectedClass, screen])
+  }, [feedItems.length, selectedClass, screen, completedIds])
 
   const scrollFeed = (direction: -1 | 1) => {
+    if (direction === 1 && !canAdvanceFromIndex(activeIndex)) {
+      showAdvanceBlockedHint(activeIndex)
+      return
+    }
     const next = Math.min(Math.max(activeIndex + direction, 0), Math.max(feedItems.length - 1, 0))
     const slides = feedRef.current?.querySelectorAll<HTMLElement>('.feed-slide')
     slides?.[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1078,6 +1118,7 @@ function App() {
                   hasNext={index < feedItems.length - 1}
                   saved={savedIds.includes(item.post.id)}
                   onToggleSave={() => toggleSaved(item.post.id)}
+                  showAdvanceHint={blockedHintPostId === item.post.id}
                 />
               )}
             </div>
@@ -1516,6 +1557,7 @@ function PostCard({
   hasNext,
   saved,
   onToggleSave,
+  showAdvanceHint,
 }: {
   post: Post
   sourceUrl: string
@@ -1529,6 +1571,7 @@ function PostCard({
   hasNext: boolean
   saved: boolean
   onToggleSave: () => void
+  showAdvanceHint: boolean
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const scrubbingRef = useRef(false)
@@ -1539,8 +1582,11 @@ function PostCard({
   const [comments, setComments] = useState(commentSeeds)
   const [playing, setPlaying] = useState(false)
   const [soundOn, setSoundOn] = useState(false)
+  const [controlsVisible, setControlsVisible] = useState(true)
   const [progress, setProgress] = useState(0)
   const soundOnRef = useRef(false)
+  const controlsTimerRef = useRef<number>()
+  const touchControls = shouldDeferVideoAutoplay()
   const [shareOpen, setShareOpen] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
@@ -1560,6 +1606,31 @@ function PostCard({
   const classMeta = classFilters.find((item) => item.id === post.classCode)
   const ClassIcon = classMeta?.Icon ?? BookOpen
 
+  const scheduleControlsHide = () => {
+    window.clearTimeout(controlsTimerRef.current)
+    if (!touchControls) return
+    controlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2500)
+  }
+
+  const showControls = () => {
+    setControlsVisible(true)
+    scheduleControlsHide()
+  }
+
+  useEffect(() => () => window.clearTimeout(controlsTimerRef.current), [])
+
+  useEffect(() => {
+    window.clearTimeout(controlsTimerRef.current)
+    if (!playing) {
+      setControlsVisible(true)
+      return
+    }
+    if (touchControls) {
+      setControlsVisible(true)
+      scheduleControlsHide()
+    }
+  }, [playing, touchControls])
+
   useEffect(() => {
     soundOnRef.current = soundOn
   }, [soundOn])
@@ -1571,6 +1642,8 @@ function PostCard({
       setAutoNextArmed(false)
       setSoundOn(false)
       soundOnRef.current = false
+      setControlsVisible(true)
+      window.clearTimeout(controlsTimerRef.current)
       const video = videoRef.current
       if (video) {
         video.pause()
@@ -1624,19 +1697,8 @@ function PostCard({
     video.setAttribute('webkit-playsinline', '')
 
     if (active) {
-      if (shouldDeferVideoAutoplay() && !isSessionAudioUnlocked()) {
-        video.pause()
-        video.muted = true
-      } else {
-        if (isSessionAudioUnlocked()) {
-          video.muted = false
-          soundOnRef.current = true
-          setSoundOn(true)
-        } else {
-          video.muted = !soundOnRef.current
-        }
-        void video.play().catch(() => {})
-      }
+      video.muted = !soundOnRef.current
+      void video.play().catch(() => {})
     } else {
       video.pause()
       video.muted = true
@@ -1649,16 +1711,6 @@ function PostCard({
       video.removeEventListener('loadedmetadata', onLoaded)
     }
   }, [active, post.modality, post.video, completed])
-
-  const startPlaybackWithSound = () => {
-    const video = videoRef.current
-    if (!video) return
-
-    primeVideoForSound(video)
-    soundOnRef.current = true
-    setSoundOn(true)
-    void video.play().catch(() => {})
-  }
 
   const unlockSound = () => {
     const video = videoRef.current
@@ -1683,21 +1735,23 @@ function PostCard({
     const video = videoRef.current
     if (!video) return
 
-    if (shouldDeferVideoAutoplay() && (video.paused || !soundOnRef.current)) {
-      startPlaybackWithSound()
-      return
-    }
-
-    if (video.muted || !soundOnRef.current) {
-      unlockSound()
+    if (touchControls && playing && !controlsVisible) {
+      showControls()
       return
     }
 
     if (video.paused) {
       void video.play().catch(() => {})
-    } else {
-      video.pause()
+      return
     }
+
+    if (!soundOnRef.current) {
+      unlockSound()
+      if (touchControls) showControls()
+      return
+    }
+
+    video.pause()
   }
 
   const seekToRatio = (ratio: number) => {
@@ -1880,11 +1934,12 @@ function PostCard({
           </div>
 
           {post.modality === 'video' && post.video ? (
-            <div className="lesson-media">
+            <div className={`lesson-media${touchControls && playing && !controlsVisible ? ' controls-hidden' : ''}`}>
               <video
                 ref={videoRef}
                 src={post.video}
                 playsInline
+                muted={!soundOn}
                 loop={false}
                 preload="auto"
                 onEnded={finishVideo}
@@ -1892,7 +1947,7 @@ function PostCard({
               />
               <button
                 type="button"
-                className={`video-play-toggle ${playing ? 'playing' : ''}${playing && !soundOn ? ' playing-muted' : ''}`}
+                className={`video-play-toggle ${playing ? 'playing' : ''}${playing && !soundOn ? ' playing-muted' : ''}${touchControls && playing && !controlsVisible ? ' controls-hidden' : ''}`}
                 onClick={(event) => {
                   event.stopPropagation()
                   handleVideoControl()
@@ -1917,12 +1972,6 @@ function PostCard({
                 tabIndex={0}
                 onPointerDown={(event) => {
                   scrubbingRef.current = true
-                  const video = videoRef.current
-                  if (video && !soundOnRef.current) {
-                    primeVideoForSound(video)
-                    soundOnRef.current = true
-                    setSoundOn(true)
-                  }
                   event.currentTarget.setPointerCapture(event.pointerId)
                   seekToRatio(ratioFromEvent(event))
                 }}
@@ -2012,6 +2061,12 @@ function PostCard({
               <span className="action-icon"><Link size={20} /></span>
             </button>
           </aside>
+
+          {showAdvanceHint && post.modality === 'drill' && (
+            <p className="post-advance-hint" role="status">
+              Complete this quiz before moving on.
+            </p>
+          )}
         </article>
       </div>
 
