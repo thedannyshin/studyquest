@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
   Atom,
@@ -12,6 +13,7 @@ import {
   Home,
   Landmark,
   Link,
+  Menu,
   MessageCircle,
   Pause,
   Play,
@@ -46,8 +48,6 @@ type Post = {
   video?: string
   quiz?: Quiz
   privacy?: 'classmates' | 'only-me'
-  /** Video credit: Study Quest AI or student name */
-  postedBy?: string
 }
 
 type UploadPrivacy = 'classmates' | 'only-me'
@@ -69,7 +69,6 @@ const posts: Post[] = [
     topic: 'polarity',
     sourceLabel: 'Water properties',
     video: '/biology-water.mp4',
-    postedBy: 'Study Quest AI',
   },
   {
     id: 4,
@@ -111,7 +110,6 @@ const posts: Post[] = [
     topic: 'bonds',
     sourceLabel: 'Bonding unit',
     video: '/chemistry-bonds.mp4',
-    postedBy: 'Study Quest AI',
   },
   {
     id: 6,
@@ -140,7 +138,6 @@ const posts: Post[] = [
     topic: 'silk-road',
     sourceLabel: 'Trade networks',
     video: '/biology-water.mp4',
-    postedBy: 'Study Quest AI',
   },
 ]
 
@@ -324,6 +321,7 @@ function App() {
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
   const [uploadDragging, setUploadDragging] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const feedRef = useRef<HTMLElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
@@ -440,6 +438,13 @@ function App() {
     setSelectedClass(classCode)
     setMainView('feed')
     setCommentsOpen(false)
+    setMobileNavOpen(false)
+  }
+
+  const openMainView = (view: MainView) => {
+    setMainView(view)
+    setCommentsOpen(false)
+    setMobileNavOpen(false)
   }
 
   const logOut = () => {
@@ -469,7 +474,6 @@ function App() {
         sourceLabel: 'Your upload',
         video: videoUrl,
         privacy,
-        postedBy: PROFILE_NAME,
       },
       ...current,
     ])
@@ -705,8 +709,31 @@ function App() {
   }
 
   return (
-    <main className={`app-shell ${commentsOpen && mainView === 'feed' ? 'comments-open' : ''}`}>
-      <aside className="app-sidebar" aria-label="Study Quest">
+    <main className={`app-shell ${commentsOpen && mainView === 'feed' ? 'comments-open' : ''}${mobileNavOpen ? ' nav-open' : ''}`}>
+      <button
+        type="button"
+        className="mobile-menu-btn"
+        aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={mobileNavOpen}
+        aria-controls="app-sidebar"
+        onClick={() => {
+          setCommentsOpen(false)
+          setMobileNavOpen((open) => !open)
+        }}
+      >
+        {mobileNavOpen ? <X size={22} strokeWidth={2.2} /> : <Menu size={22} strokeWidth={2.2} />}
+      </button>
+
+      {mobileNavOpen && (
+        <button
+          type="button"
+          className="mobile-nav-backdrop"
+          aria-label="Close menu"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      <aside id="app-sidebar" className={`app-sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="Study Quest">
         <div className="sidebar-top">
           <div className="wordmark">Study Quest</div>
 
@@ -739,10 +766,7 @@ function App() {
             <button
               type="button"
               className={`nav-parent ${mainView === 'saved' ? 'active' : ''}`}
-              onClick={() => {
-                setMainView('saved')
-                setCommentsOpen(false)
-              }}
+              onClick={() => openMainView('saved')}
             >
               <Bookmark size={22} strokeWidth={mainView === 'saved' ? 2.4 : 2} />
               <span>Saved</span>
@@ -751,10 +775,7 @@ function App() {
             <button
               type="button"
               className={`nav-parent ${mainView === 'upload' ? 'active' : ''}`}
-              onClick={() => {
-                setMainView('upload')
-                setCommentsOpen(false)
-              }}
+              onClick={() => openMainView('upload')}
             >
               <Plus size={22} strokeWidth={mainView === 'upload' ? 2.4 : 2} />
               <span>Upload</span>
@@ -765,10 +786,7 @@ function App() {
         <button
           type="button"
           className={`nav-parent sidebar-profile ${mainView === 'profile' ? 'active' : ''}`}
-          onClick={() => {
-            setMainView('profile')
-            setCommentsOpen(false)
-          }}
+          onClick={() => openMainView('profile')}
         >
           <User size={22} strokeWidth={mainView === 'profile' ? 2.4 : 2} />
           <span>Profile</span>
@@ -1168,50 +1186,6 @@ function App() {
           </div>
         </section>
       )}
-
-      <nav className="mobile-tabbar" aria-label="Primary">
-        <button
-          type="button"
-          className={mainView === 'feed' ? 'active' : ''}
-          onClick={() => openFeedClass(selectedClass === 'All' ? 'All' : selectedClass)}
-        >
-          <Home size={24} strokeWidth={mainView === 'feed' ? 2.4 : 2} />
-          <span>Feed</span>
-        </button>
-        <button
-          type="button"
-          className={mainView === 'saved' ? 'active' : ''}
-          onClick={() => {
-            setMainView('saved')
-            setCommentsOpen(false)
-          }}
-        >
-          <Bookmark size={24} strokeWidth={mainView === 'saved' ? 2.4 : 2} />
-          <span>Saved</span>
-        </button>
-        <button
-          type="button"
-          className={mainView === 'upload' ? 'active' : ''}
-          onClick={() => {
-            setMainView('upload')
-            setCommentsOpen(false)
-          }}
-        >
-          <Plus size={24} strokeWidth={mainView === 'upload' ? 2.4 : 2} />
-          <span>Upload</span>
-        </button>
-        <button
-          type="button"
-          className={mainView === 'profile' ? 'active' : ''}
-          onClick={() => {
-            setMainView('profile')
-            setCommentsOpen(false)
-          }}
-        >
-          <User size={24} strokeWidth={mainView === 'profile' ? 2.4 : 2} />
-          <span>Profile</span>
-        </button>
-      </nav>
     </main>
   )
 }
@@ -1462,19 +1436,7 @@ function PostCard({
           <button type="button" className="post-class" onClick={() => onClassClick(post.classCode)}>
             {post.classCode}
           </button>
-          {post.modality === 'video' && (
-            <div className="post-meta-left">
-              {post.privacy === 'only-me' && <span className="post-privacy">Only you</span>}
-              <span className="post-credit">
-                {post.postedBy === 'Study Quest AI'
-                  ? 'Study Quest AI generated'
-                  : `${post.postedBy ?? PROFILE_NAME} posted`}
-              </span>
-            </div>
-          )}
-          {post.modality !== 'video' && post.privacy === 'only-me' && (
-            <span className="post-privacy">Only you</span>
-          )}
+          {post.privacy === 'only-me' && <span className="post-privacy">Only you</span>}
 
           {completed && post.modality === 'video' ? (
             <div className="video-end">
@@ -1637,32 +1599,41 @@ function PostCard({
         </div>
       )}
 
-      {active && commentsOpen && post.modality === 'video' && (
-        <aside className="comments-sidebar" aria-label="Comments">
-          <header>
-            <strong>Comments {comments.length}</strong>
-            <button type="button" onClick={() => onCommentsOpenChange(false)} aria-label="Close comments">
-              <X size={18} />
-            </button>
-          </header>
-          <div className="inline-comments-list">
-            {comments.map((item, index) => (
-              <article className="inline-comment" key={`${item.name}-${index}`}>
-                <img className="comment-avatar" src={item.avatar} alt="" />
-                <p><strong>{item.name}</strong> {item.text}</p>
-              </article>
-            ))}
-          </div>
-          <form className="inline-comment-form" onSubmit={addComment}>
-            <input
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-              placeholder="Add a comment"
-              aria-label="Add a comment"
-            />
-            <button type="submit" disabled={!comment.trim()}>Post</button>
-          </form>
-        </aside>
+      {active && commentsOpen && post.modality === 'video' && createPortal(
+        <>
+          <button
+            type="button"
+            className="comments-backdrop"
+            aria-label="Close comments"
+            onClick={() => onCommentsOpenChange(false)}
+          />
+          <aside className="comments-sidebar" aria-label="Comments">
+            <header>
+              <strong>Comments {comments.length}</strong>
+              <button type="button" onClick={() => onCommentsOpenChange(false)} aria-label="Close comments">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="inline-comments-list">
+              {comments.map((item, index) => (
+                <article className="inline-comment" key={`${item.name}-${index}`}>
+                  <img className="comment-avatar" src={item.avatar} alt="" />
+                  <p><strong>{item.name}</strong> {item.text}</p>
+                </article>
+              ))}
+            </div>
+            <form className="inline-comment-form" onSubmit={addComment}>
+              <input
+                value={comment}
+                onChange={(event) => setComment(event.target.value)}
+                placeholder="Add a comment"
+                aria-label="Add a comment"
+              />
+              <button type="submit" disabled={!comment.trim()}>Post</button>
+            </form>
+          </aside>
+        </>,
+        document.body,
       )}
     </>
   )
