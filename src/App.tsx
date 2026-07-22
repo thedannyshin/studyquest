@@ -1262,6 +1262,7 @@ function PostCard({
   const [shareCopied, setShareCopied] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
   const [classOpen, setClassOpen] = useState(false)
+  const [autoNextArmed, setAutoNextArmed] = useState(false)
   const recordedRef = useRef(false)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
@@ -1280,16 +1281,18 @@ function PostCard({
     if (!active) {
       setCreditOpen(false)
       setClassOpen(false)
+      setAutoNextArmed(false)
     }
   }, [active])
 
   useEffect(() => {
-    if (!active || !completed || post.modality !== 'video' || !hasNext) return
+    if (!active || !completed || !autoNextArmed || post.modality !== 'video' || !hasNext) return
     const timer = window.setTimeout(() => {
+      setAutoNextArmed(false)
       onNextRef.current()
     }, 3000)
     return () => window.clearTimeout(timer)
-  }, [active, completed, hasNext, post.modality, post.id])
+  }, [active, completed, autoNextArmed, hasNext, post.modality, post.id])
 
   useEffect(() => {
     if (post.modality !== 'video' || completed) return
@@ -1358,6 +1361,7 @@ function PostCard({
     if (recordedRef.current) return
     recordedRef.current = true
     setCompleted(true)
+    setAutoNextArmed(true)
     onCheck(post.topic, true)
     onComplete()
   }
@@ -1388,6 +1392,7 @@ function PostCard({
 
   const redo = () => {
     recordedRef.current = false
+    setAutoNextArmed(false)
     setCompleted(false)
     setSubmitted(false)
     setAnswer('')
@@ -1396,6 +1401,11 @@ function PostCard({
       videoRef.current.currentTime = 0
       videoRef.current.play().catch(() => {})
     }
+  }
+
+  const goNext = () => {
+    setAutoNextArmed(false)
+    onNext()
   }
 
   const addComment = (event: FormEvent) => {
@@ -1534,8 +1544,8 @@ function PostCard({
                 Watch again
               </button>
               {hasNext && (
-                <button type="button" className="video-end-primary" onClick={onNext}>
-                  <span className="video-end-progress" aria-hidden="true" />
+                <button type="button" className="video-end-primary" onClick={goNext}>
+                  {autoNextArmed && <span className="video-end-progress" aria-hidden="true" />}
                   <span className="video-end-label">Next</span>
                 </button>
               )}
