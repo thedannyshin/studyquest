@@ -273,6 +273,7 @@ const commentSeeds = [
 const SESSION_KEY = 'study-quest-session'
 const SAVED_KEY = 'study-quest-saved'
 const PROGRESS_KEY = 'study-quest-progress'
+const ANSWERED_KEY = 'study-quest-answered'
 const PROFILE_PHOTO = 'https://randomuser.me/api/portraits/women/68.jpg'
 const PROFILE_NAME = 'Alex Morgan'
 const PROFILE_EMAIL = 'alex@northbridge.edu'
@@ -347,6 +348,22 @@ function writeCompletedIds(ids: number[]) {
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(ids))
 }
 
+function readAnsweredIds(): number[] {
+  try {
+    const raw = localStorage.getItem(ANSWERED_KEY)
+    if (!raw) return []
+    const data = JSON.parse(raw) as unknown
+    if (!Array.isArray(data)) return []
+    return data.filter((id): id is number => typeof id === 'number')
+  } catch {
+    return []
+  }
+}
+
+function writeAnsweredIds(ids: number[]) {
+  localStorage.setItem(ANSWERED_KEY, JSON.stringify(ids))
+}
+
 function App() {
   const initialSession = useMemo(() => readSession(), [])
   const [screen, setScreen] = useState<Screen>(() => initialSession.screen)
@@ -363,6 +380,7 @@ function App() {
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [savedIds, setSavedIds] = useState<number[]>(() => readSavedIds())
   const [completedIds, setCompletedIds] = useState<number[]>(() => readCompletedIds())
+  const [answeredIds, setAnsweredIds] = useState<number[]>(() => readAnsweredIds())
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('all')
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [uploadClass, setUploadClass] = useState(classes[0])
@@ -393,6 +411,10 @@ function App() {
   }, [completedIds])
 
   useEffect(() => {
+    writeAnsweredIds(answeredIds)
+  }, [answeredIds])
+
+  useEffect(() => {
     if (mainView !== 'upload') setUploadPickerOpen(false)
   }, [mainView])
 
@@ -414,7 +436,7 @@ function App() {
       const videos = classPosts.filter((post) => post.modality === 'video')
       const quizzes = classPosts.filter((post) => post.modality === 'drill')
       const videosDone = videos.filter((post) => completedIds.includes(post.id)).length
-      const quizzesDone = quizzes.filter((post) => completedIds.includes(post.id)).length
+      const quizzesDone = quizzes.filter((post) => answeredIds.includes(post.id)).length
       const total = videos.length + quizzes.length
       const done = videosDone + quizzesDone
       let status = 'Not started'
@@ -431,7 +453,7 @@ function App() {
         percent: total === 0 ? 0 : Math.round((done / total) * 100),
       }
     })
-  }, [allPosts, completedIds])
+  }, [allPosts, completedIds, answeredIds])
 
   const overallProgress = useMemo(() => {
     const total = classProgress.reduce((sum, item) => sum + item.total, 0)
@@ -445,6 +467,10 @@ function App() {
 
   const markComplete = (postId: number) => {
     setCompletedIds((current) => (current.includes(postId) ? current : [...current, postId]))
+  }
+
+  const markAnswered = (postId: number) => {
+    setAnsweredIds((current) => (current.includes(postId) ? current : [...current, postId]))
   }
 
   const selectedGenerateSample = useMemo(
@@ -693,8 +719,10 @@ function App() {
 
   const allPostsComplete = useMemo(() => {
     if (visiblePosts.length === 0) return false
-    return visiblePosts.every((post) => completedIds.includes(post.id))
-  }, [visiblePosts, completedIds])
+    return visiblePosts.every((post) => (
+      post.modality === 'drill' ? answeredIds.includes(post.id) : true
+    ))
+  }, [visiblePosts, answeredIds])
 
   const feedItems = useMemo(() => {
     const items: Array<
@@ -714,12 +742,16 @@ function App() {
   const visibleFeedItems = useMemo(() => {
     for (let i = 0; i < feedItems.length; i++) {
       const item = feedItems[i]
-      if (item.type === 'post' && item.post.modality === 'drill' && !completedIds.includes(item.post.id)) {
+      if (
+        item.type === 'post'
+        && item.post.modality === 'drill'
+        && !answeredIds.includes(item.post.id)
+      ) {
         return feedItems.slice(0, i + 1)
       }
     }
     return feedItems
-  }, [feedItems, completedIds])
+  }, [feedItems, answeredIds])
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: 0 })
@@ -1078,13 +1110,14 @@ function App() {
                   onCommentsOpenChange={setCommentsOpen}
                   onCheck={recordCheck}
                   onComplete={() => markComplete(item.post.id)}
+                  onQuizAnswered={() => markAnswered(item.post.id)}
                   onNext={() => scrollFeed(1)}
                   hasNext={index < visibleFeedItems.length - 1}
                   saved={savedIds.includes(item.post.id)}
                   onToggleSave={() => toggleSaved(item.post.id)}
                   showContinueHint={
                     item.post.modality === 'drill'
-                    && !completedIds.includes(item.post.id)
+                    && !answeredIds.includes(item.post.id)
                     && index === visibleFeedItems.length - 1
                   }
                 />
@@ -1521,6 +1554,7 @@ function PostCard({
   onCommentsOpenChange,
   onCheck,
   onComplete,
+  onQuizAnswered,
   onNext,
   hasNext,
   saved,
@@ -1535,6 +1569,7 @@ function PostCard({
   onCommentsOpenChange: (open: boolean) => void
   onCheck: (topic: string, correct: boolean) => void
   onComplete: () => void
+  onQuizAnswered: () => void
   onNext: () => void
   hasNext: boolean
   saved: boolean
@@ -1753,7 +1788,7 @@ function PostCard({
     if (recordedRef.current) return
     recordedRef.current = true
     onCheck(post.topic, isCorrect)
-    onComplete()
+    onQuizAnswered()
   }
 
   const submitQuiz = () => {
