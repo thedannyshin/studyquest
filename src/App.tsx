@@ -862,7 +862,7 @@ function App() {
                           className="due-more"
                           onClick={() => setShowAllDues((open) => !open)}
                         >
-                          {showAllDues ? 'Show this class only' : 'See other classes'}
+                          {showAllDues ? `Show ${selectedClass} only` : 'See other classes'}
                         </button>
                       )}
                     </div>
@@ -956,6 +956,7 @@ function App() {
       </div>
       ) : mainView === 'saved' ? (
         <section className="panel-view" aria-label="Saved">
+          <p className="mobile-page-title">Saved</p>
           <header className="panel-header">
             <h1>Saved</h1>
             <p>{savedPosts.length === 0 ? 'Nothing saved yet.' : `${savedPosts.length} saved`}</p>
@@ -1034,6 +1035,7 @@ function App() {
         </section>
       ) : mainView === 'upload' ? (
         <section className="panel-view" aria-label="Upload">
+          <p className="mobile-page-title">Upload</p>
           <header className="panel-header">
             <h1>Upload</h1>
             <p>Add a study video to your class feed.</p>
@@ -1121,6 +1123,7 @@ function App() {
         </section>
       ) : (
         <section className="panel-view" aria-label="Profile">
+          <p className="mobile-page-title">Profile</p>
           <header className="panel-header profile-header">
             <img className="profile-avatar" src={PROFILE_PHOTO} alt={PROFILE_NAME} />
             <div className="profile-identity">
