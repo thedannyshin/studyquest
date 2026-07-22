@@ -834,7 +834,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
   scrollbar-width: none;
   background: #141414;
   --comments-w: 0px;
@@ -912,25 +912,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   place-items: center;
   cursor: pointer;
   z-index: 2;
-  opacity: 1;
+  opacity: 0;
+  pointer-events: none;
   transition: opacity .2s ease;
 }
-.video-play-toggle.playing {
-  opacity: 0;
-  pointer-events: none;
-}
-.video-play-toggle.playing-muted {
+.video-play-toggle.is-shown {
   opacity: 1;
   pointer-events: auto;
 }
-.video-play-toggle.controls-hidden,
-.lesson-media.controls-hidden .video-play-toggle {
-  opacity: 0;
-  pointer-events: none;
-}
-.lesson-media:hover .video-play-toggle.playing {
-  opacity: 1;
-  pointer-events: auto;
+@media (hover: hover) and (pointer: fine) {
+  .lesson-media:hover .video-play-toggle {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .video-timeline {
   position: absolute;
@@ -1090,14 +1084,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   bottom: 20px;
   z-index: 4;
   margin: 0;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.78);
+  padding: 0;
   color: #f2f2f2;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.35;
   text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
   pointer-events: none;
   animation: post-advance-hint-in 0.2s ease;
 }

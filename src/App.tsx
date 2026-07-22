@@ -382,6 +382,7 @@ function App() {
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const activeIndexRef = useRef(0)
   const blockedHintTimerRef = useRef<number>()
+  const blockedHintPostIdRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (screen === 'feed') writeSession(true, provider)
@@ -733,16 +734,50 @@ function App() {
   const showAdvanceBlockedHint = (index: number) => {
     const item = feedItemsRef.current[index]
     if (item?.type !== 'post' || item.post.modality !== 'drill') return
+    if (blockedHintPostIdRef.current === item.post.id) return
+    blockedHintPostIdRef.current = item.post.id
     setBlockedHintPostId(item.post.id)
     window.clearTimeout(blockedHintTimerRef.current)
-    blockedHintTimerRef.current = window.setTimeout(() => setBlockedHintPostId(null), 3000)
+    blockedHintTimerRef.current = window.setTimeout(() => {
+      blockedHintPostIdRef.current = null
+      setBlockedHintPostId(null)
+    }, 3000)
   }
 
   useEffect(() => {
     if (blockedHintPostId && completedIds.includes(blockedHintPostId)) {
+      blockedHintPostIdRef.current = null
       setBlockedHintPostId(null)
     }
   }, [completedIds, blockedHintPostId])
+
+  useEffect(() => {
+    if (screen !== 'feed') return
+    const root = feedRef.current
+    if (!root) return
+
+    let clamping = false
+    const clampForwardScroll = () => {
+      if (clamping) return
+
+      const slideHeight = root.clientHeight
+      if (slideHeight <= 0) return
+
+      const current = activeIndexRef.current
+      if (canAdvanceFromIndex(current)) return
+
+      const maxTop = current * slideHeight
+      if (root.scrollTop <= maxTop + 1) return
+
+      clamping = true
+      root.scrollTop = maxTop
+      clamping = false
+      showAdvanceBlockedHint(current)
+    }
+
+    root.addEventListener('scroll', clampForwardScroll, { passive: true })
+    return () => root.removeEventListener('scroll', clampForwardScroll)
+  }, [screen, feedItems.length, completedIds])
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: 0 })
@@ -773,11 +808,7 @@ function App() {
         if (index < 0) return
 
         const current = activeIndexRef.current
-        if (index > current && !canAdvanceFromIndex(current)) {
-          slides[current]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          showAdvanceBlockedHint(current)
-          return
-        }
+        if (index > current && !canAdvanceFromIndex(current)) return
 
         setActiveIndex(index)
       },
@@ -1606,30 +1637,25 @@ function PostCard({
   const classMeta = classFilters.find((item) => item.id === post.classCode)
   const ClassIcon = classMeta?.Icon ?? BookOpen
 
-  const scheduleControlsHide = () => {
-    window.clearTimeout(controlsTimerRef.current)
+  const hideControlsAfterDelay = () => {
     if (!touchControls) return
+    window.clearTimeout(controlsTimerRef.current)
+    setControlsVisible(true)
     controlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2500)
   }
 
   const showControls = () => {
-    setControlsVisible(true)
-    scheduleControlsHide()
+    hideControlsAfterDelay()
   }
 
   useEffect(() => () => window.clearTimeout(controlsTimerRef.current), [])
 
   useEffect(() => {
-    window.clearTimeout(controlsTimerRef.current)
     if (!playing) {
+      window.clearTimeout(controlsTimerRef.current)
       setControlsVisible(true)
-      return
     }
-    if (touchControls) {
-      setControlsVisible(true)
-      scheduleControlsHide()
-    }
-  }, [playing, touchControls])
+  }, [playing])
 
   useEffect(() => {
     soundOnRef.current = soundOn
@@ -1678,8 +1704,15 @@ function PostCard({
     const video = videoRef.current
     if (!video) return
 
-    const onPlay = () => setPlaying(true)
-    const onPause = () => setPlaying(false)
+    const onPlay = () => {
+      setPlaying(true)
+      hideControlsAfterDelay()
+    }
+    const onPause = () => {
+      setPlaying(false)
+      window.clearTimeout(controlsTimerRef.current)
+      setControlsVisible(true)
+    }
     const onTimeUpdate = () => {
       if (scrubbingRef.current || !video.duration) return
       setProgress(video.currentTime / video.duration)
@@ -1698,7 +1731,9 @@ function PostCard({
 
     if (active) {
       video.muted = !soundOnRef.current
-      void video.play().catch(() => {})
+      void video.play().then(() => {
+        if (!video.paused) hideControlsAfterDelay()
+      }).catch(() => {})
     } else {
       video.pause()
       video.muted = true
@@ -1781,7 +1816,7 @@ function PostCard({
     if (recordedRef.current) return
     recordedRef.current = true
     onCheck(post.topic, isCorrect)
-    if (isCorrect) onComplete()
+    onComplete()
   }
 
   const submitQuiz = () => {
@@ -1816,6 +1851,8 @@ function PostCard({
     ])
     setComment('')
   }
+
+  const showCenterControl = !playing || controlsVisible
 
   const renderQuiz = () => {
     if (!quiz) return null
@@ -1934,7 +1971,7 @@ function PostCard({
           </div>
 
           {post.modality === 'video' && post.video ? (
-            <div className={`lesson-media${touchControls && playing && !controlsVisible ? ' controls-hidden' : ''}`}>
+            <div className="lesson-media">
               <video
                 ref={videoRef}
                 src={post.video}
@@ -1947,7 +1984,7 @@ function PostCard({
               />
               <button
                 type="button"
-                className={`video-play-toggle ${playing ? 'playing' : ''}${playing && !soundOn ? ' playing-muted' : ''}${touchControls && playing && !controlsVisible ? ' controls-hidden' : ''}`}
+                className={`video-play-toggle${showCenterControl ? ' is-shown' : ''}${playing && !soundOn ? ' is-muted' : ''}`}
                 onClick={(event) => {
                   event.stopPropagation()
                   handleVideoControl()
@@ -2064,7 +2101,7 @@ function PostCard({
 
           {showAdvanceHint && post.modality === 'drill' && (
             <p className="post-advance-hint" role="status">
-              Complete this quiz before moving on.
+              Answer this quiz before moving on.
             </p>
           )}
         </article>
