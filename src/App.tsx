@@ -1564,24 +1564,20 @@ function PostCard({
     soundOnRef.current = soundOn
   }, [soundOn])
 
-  const nativeControls = shouldDeferVideoAutoplay()
-
   useEffect(() => {
     if (!active) {
       setCreditOpen(false)
       setClassOpen(false)
       setAutoNextArmed(false)
-      if (!nativeControls) {
-        setSoundOn(false)
-        soundOnRef.current = false
-      }
+      setSoundOn(false)
+      soundOnRef.current = false
       const video = videoRef.current
       if (video) {
         video.pause()
-        if (!nativeControls) video.muted = true
+        video.muted = true
       }
     }
-  }, [active, nativeControls])
+  }, [active])
 
   useEffect(() => {
     if (!creditOpen) return
@@ -1628,7 +1624,7 @@ function PostCard({
     video.setAttribute('webkit-playsinline', '')
 
     if (active) {
-      if (!nativeControls && shouldDeferVideoAutoplay() && !isSessionAudioUnlocked()) {
+      if (shouldDeferVideoAutoplay() && !isSessionAudioUnlocked()) {
         video.pause()
         video.muted = true
       } else {
@@ -1643,7 +1639,7 @@ function PostCard({
       }
     } else {
       video.pause()
-      if (!nativeControls) video.muted = true
+      video.muted = true
     }
 
     return () => {
@@ -1652,7 +1648,7 @@ function PostCard({
       video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('loadedmetadata', onLoaded)
     }
-  }, [active, post.modality, post.video, completed, nativeControls])
+  }, [active, post.modality, post.video, completed])
 
   const startPlaybackWithSound = () => {
     const video = videoRef.current
@@ -1884,19 +1880,16 @@ function PostCard({
           </div>
 
           {post.modality === 'video' && post.video ? (
-            <div className={`lesson-media${nativeControls ? ' native-controls' : ''}`}>
+            <div className="lesson-media">
               <video
                 ref={videoRef}
                 src={post.video}
                 playsInline
-                controls={nativeControls}
                 loop={false}
                 preload="auto"
                 onEnded={finishVideo}
-                onClick={nativeControls ? undefined : handleVideoControl}
+                onClick={handleVideoControl}
               />
-              {!nativeControls && (
-                <>
               <button
                 type="button"
                 className={`video-play-toggle ${playing ? 'playing' : ''}${playing && !soundOn ? ' playing-muted' : ''}`}
@@ -1952,8 +1945,6 @@ function PostCard({
                   <span className="video-timeline-fill" style={{ width: `${progress * 100}%` }} />
                 </span>
               </div>
-                </>
-              )}
             </div>
           ) : (
             <div className="quiz-stack">
