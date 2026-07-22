@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Dna,
   Home,
+  Info,
   Landmark,
   Link,
   Menu,
@@ -48,6 +49,7 @@ type Post = {
   video?: string
   quiz?: Quiz
   privacy?: 'classmates' | 'only-me'
+  postedBy?: string
 }
 
 type UploadPrivacy = 'classmates' | 'only-me'
@@ -69,6 +71,7 @@ const posts: Post[] = [
     topic: 'polarity',
     sourceLabel: 'Water properties',
     video: '/biology-water.mp4',
+    postedBy: 'Study Quest AI',
   },
   {
     id: 4,
@@ -110,6 +113,7 @@ const posts: Post[] = [
     topic: 'bonds',
     sourceLabel: 'Bonding unit',
     video: '/chemistry-bonds.mp4',
+    postedBy: 'Study Quest AI',
   },
   {
     id: 6,
@@ -138,6 +142,7 @@ const posts: Post[] = [
     topic: 'silk-road',
     sourceLabel: 'Trade networks',
     video: '/biology-water.mp4',
+    postedBy: 'Study Quest AI',
   },
 ]
 
@@ -474,6 +479,7 @@ function App() {
         sourceLabel: 'Your upload',
         video: videoUrl,
         privacy,
+        postedBy: PROFILE_NAME,
       },
       ...current,
     ])
@@ -822,13 +828,15 @@ function App() {
                 <div className="tiktok-row">
                   <article className="post-frame due">
                     {selectedClass !== 'All' && (
-                      <button
-                        type="button"
-                        className="post-class"
-                        onClick={() => setSelectedClass(selectedClass)}
-                      >
-                        {selectedClass}
-                      </button>
+                      <div className="post-top-left">
+                        <button
+                          type="button"
+                          className="post-class"
+                          onClick={() => setSelectedClass(selectedClass)}
+                        >
+                          {selectedClass}
+                        </button>
+                      </div>
                     )}
                     <div className="due-panel">
                       <h2>From your {providerLabel}</h2>
@@ -858,13 +866,15 @@ function App() {
               ) : item.type === 'assignment' ? (
                 <div className="tiktok-row">
                   <article className="post-frame assignment">
-                    <button
-                      type="button"
-                      className="post-class"
-                      onClick={() => setSelectedClass(assignment.classCode)}
-                    >
-                      {assignment.classCode}
-                    </button>
+                    <div className="post-top-left">
+                      <button
+                        type="button"
+                        className="post-class"
+                        onClick={() => setSelectedClass(assignment.classCode)}
+                      >
+                        {assignment.classCode}
+                      </button>
+                    </div>
                     <div className="assignment-content">
                       <h2>Ready for {assignment.title}</h2>
                       <p>You have the polarity checks. Open it while it is fresh.</p>
@@ -1239,7 +1249,10 @@ function PostCard({
   const [progress, setProgress] = useState(0)
   const [shareOpen, setShareOpen] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const [creditOpen, setCreditOpen] = useState(false)
   const recordedRef = useRef(false)
+  const onNextRef = useRef(onNext)
+  onNextRef.current = onNext
 
   const shareUrl = `${typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''}#lesson-${post.id}`
 
@@ -1248,6 +1261,18 @@ function PostCard({
     ? answer.trim().toLowerCase() === quiz.answer.toLowerCase()
     : false
   const title = post.modality === 'drill' && quiz ? quiz.question : post.title
+
+  useEffect(() => {
+    if (!active) setCreditOpen(false)
+  }, [active])
+
+  useEffect(() => {
+    if (!active || !completed || post.modality !== 'video' || !hasNext) return
+    const timer = window.setTimeout(() => {
+      onNextRef.current()
+    }, 3000)
+    return () => window.clearTimeout(timer)
+  }, [active, completed, hasNext, post.modality, post.id])
 
   useEffect(() => {
     if (post.modality !== 'video' || completed) return
@@ -1444,10 +1469,33 @@ function PostCard({
     <>
       <div className="tiktok-row">
         <article className={`post-frame ${post.modality}${completed ? ' done' : ''}`} id={`lesson-${post.id}`}>
-          <button type="button" className="post-class" onClick={() => onClassClick(post.classCode)}>
-            {post.classCode}
-          </button>
-          {post.privacy === 'only-me' && <span className="post-privacy">Only you</span>}
+          <div className="post-top-left">
+            <button type="button" className="post-class" onClick={() => onClassClick(post.classCode)}>
+              {post.classCode}
+            </button>
+            {post.privacy === 'only-me' && <span className="post-privacy">Only you</span>}
+          </div>
+
+          {post.modality === 'video' && (
+            <div className={`post-credit ${creditOpen ? 'open' : ''}`}>
+              <button
+                type="button"
+                className="post-credit-btn"
+                aria-label="Video credit"
+                aria-expanded={creditOpen}
+                onClick={() => setCreditOpen((open) => !open)}
+              >
+                <Info size={18} strokeWidth={2.2} />
+              </button>
+              {creditOpen && (
+                <p className="post-credit-tip">
+                  {post.postedBy === 'Study Quest AI'
+                    ? 'Study Quest AI generated'
+                    : `${post.postedBy ?? PROFILE_NAME} posted`}
+                </p>
+              )}
+            </div>
+          )}
 
           {completed && post.modality === 'video' ? (
             <div className="video-end">
@@ -1456,7 +1504,8 @@ function PostCard({
               </button>
               {hasNext && (
                 <button type="button" className="video-end-primary" onClick={onNext}>
-                  Next
+                  <span className="video-end-progress" aria-hidden="true" />
+                  <span className="video-end-label">Next</span>
                 </button>
               )}
             </div>
