@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
 
 :root {
   color-scheme: dark;
@@ -33,9 +33,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: 'Bricolage Grotesque', sans-serif;
+  font-family: 'Syne', sans-serif;
   font-weight: 700;
-  font-size: 17px;
+  font-size: 22px;
   letter-spacing: -0.03em;
   color: #f2f2f2;
   flex-shrink: 0;
@@ -205,7 +205,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 }
 .app-sidebar .wordmark {
   padding: 6px 10px 4px;
-  font-size: 19px;
+  font-size: 24px;
   letter-spacing: -0.035em;
 }
 .sidebar-brand {
@@ -250,7 +250,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   flex-shrink: 0;
 }
 .nav-parent.active {
-  background: #1c1c1c;
+  color: var(--accent);
 }
 .nav-parent:hover {
   background: #1a1a1a;
@@ -281,8 +281,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   flex-shrink: 0;
 }
 .nav-sub > button.active {
-  background: #1c1c1c;
-  color: #f2f2f2;
+  color: var(--accent);
   font-weight: 700;
 }
 .nav-sub > button:hover {
