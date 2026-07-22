@@ -23,6 +23,7 @@ import {
   FileText,
   User,
   Video,
+  VolumeX,
   X,
 } from 'lucide-react'
 
@@ -1531,6 +1532,7 @@ function PostCard({
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState(commentSeeds)
   const [playing, setPlaying] = useState(false)
+  const [muted, setMuted] = useState(true)
   const [progress, setProgress] = useState(0)
   const [shareOpen, setShareOpen] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
@@ -1556,6 +1558,9 @@ function PostCard({
       setCreditOpen(false)
       setClassOpen(false)
       setAutoNextArmed(false)
+      setMuted(true)
+      const video = videoRef.current
+      if (video) video.muted = true
     }
   }, [active])
 
@@ -1622,11 +1627,26 @@ function PostCard({
     }
   }, [post.modality, post.video, completed])
 
+  const enableSound = () => {
+    const video = videoRef.current
+    if (!video || !video.muted) return
+    video.muted = false
+    setMuted(false)
+  }
+
   const togglePlayback = () => {
     const video = videoRef.current
     if (!video) return
-    if (video.paused) video.play().catch(() => {})
-    else video.pause()
+    if (playing && muted) {
+      enableSound()
+      return
+    }
+    if (video.paused) {
+      enableSound()
+      video.play().catch(() => {})
+    } else {
+      video.pause()
+    }
   }
 
   const seekToRatio = (ratio: number) => {
@@ -1814,7 +1834,7 @@ function PostCard({
                 ref={videoRef}
                 src={post.video}
                 playsInline
-                muted
+                muted={muted}
                 loop={false}
                 preload="metadata"
                 onEnded={finishVideo}
@@ -1822,11 +1842,17 @@ function PostCard({
               />
               <button
                 type="button"
-                className={`video-play-toggle ${playing ? 'playing' : ''}`}
+                className={`video-play-toggle ${playing ? 'playing' : ''}${playing && muted ? ' playing-muted' : ''}`}
                 onClick={togglePlayback}
-                aria-label={playing ? 'Pause' : 'Play'}
+                aria-label={playing && muted ? 'Unmute' : playing ? 'Pause' : 'Play'}
               >
-                {playing ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
+                {playing && muted ? (
+                  <VolumeX size={28} strokeWidth={2.2} />
+                ) : playing ? (
+                  <Pause size={28} fill="currentColor" />
+                ) : (
+                  <Play size={28} fill="currentColor" />
+                )}
               </button>
               <div
                 className="video-timeline"
@@ -1838,6 +1864,7 @@ function PostCard({
                 tabIndex={0}
                 onPointerDown={(event) => {
                   scrubbingRef.current = true
+                  enableSound()
                   event.currentTarget.setPointerCapture(event.pointerId)
                   seekToRatio(ratioFromEvent(event))
                 }}

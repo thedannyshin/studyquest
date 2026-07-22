@@ -919,6 +919,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   opacity: 0;
   pointer-events: none;
 }
+.video-play-toggle.playing-muted {
+  opacity: 1;
+  pointer-events: auto;
+}
 .lesson-media:hover .video-play-toggle.playing {
   opacity: 1;
   pointer-events: auto;
