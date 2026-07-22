@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Syne:wght@700;800&display=swap');
 
 :root {
   color-scheme: dark;
@@ -33,17 +33,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: 'Manrope', sans-serif;
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: -0.5px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.03em;
+  color: #f2f2f2;
   flex-shrink: 0;
+  text-transform: none;
 }
 
 .wordmark.light { color: #fff; }
-.wordmark-accent {
-  color: var(--accent);
-}
 .eyebrow, .step-label {
   font-size: 11px;
   font-weight: 700;
@@ -206,7 +205,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 }
 .app-sidebar .wordmark {
   padding: 6px 10px 4px;
-  font-size: 20px;
+  font-size: 19px;
+  letter-spacing: -0.035em;
 }
 .sidebar-brand {
   display: flex;

@@ -756,7 +756,7 @@ function App() {
     return (
       <main className="auth-page">
         <div className="auth-card">
-          <div className="wordmark">Study <span className="wordmark-accent">Quest</span></div>
+          <div className="wordmark">StudyQuest</div>
           <h1>{authMode === 'signup' ? 'Sign up' : 'Log in'}</h1>
 
           <form onSubmit={submitAuth}>
@@ -873,7 +873,7 @@ function App() {
       <aside id="app-sidebar" className={`app-sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="Study Quest">
         <div className="sidebar-top">
           <div className="sidebar-brand">
-            <div className="wordmark">Study <span className="wordmark-accent">Quest</span></div>
+            <div className="wordmark">StudyQuest</div>
             <button
               type="button"
               className="sidebar-close"
