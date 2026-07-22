@@ -1,6 +1,12 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  isSessionAudioUnlocked,
+  markSessionAudioUnlocked,
+  primeVideoForSound,
+  shouldDeferVideoAutoplay,
+} from './videoAudio'
+import {
   ArrowLeft,
   Atom,
   BookOpen,
@@ -112,7 +118,7 @@ const posts: Post[] = [
     topic: 'polarity',
     sourceLabel: 'Water properties',
     video: '/biology-water.mp4',
-    postedBy: 'Study Quest AI',
+    postedBy: 'StudyQuest AI',
   },
   {
     id: 4,
@@ -154,7 +160,7 @@ const posts: Post[] = [
     topic: 'bonds',
     sourceLabel: 'Bonding unit',
     video: '/chemistry-bonds.mp4',
-    postedBy: 'Study Quest AI',
+    postedBy: 'StudyQuest AI',
   },
   {
     id: 6,
@@ -183,7 +189,7 @@ const posts: Post[] = [
     topic: 'silk-road',
     sourceLabel: 'Trade networks',
     video: '/biology-water.mp4',
-    postedBy: 'Study Quest AI',
+    postedBy: 'StudyQuest AI',
   },
 ]
 
@@ -581,7 +587,7 @@ function App() {
             sourceLabel: materialName,
             video: sample.video,
             privacy,
-            postedBy: 'Study Quest AI',
+            postedBy: 'StudyQuest AI',
             generatedFrom: materialName,
           },
           ...current,
@@ -871,7 +877,7 @@ function App() {
         />
       )}
 
-      <aside id="app-sidebar" className={`app-sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="Study Quest">
+      <aside id="app-sidebar" className={`app-sidebar${mobileNavOpen ? ' open' : ''}`} aria-label="StudyQuest">
         <div className="sidebar-top">
           <div className="sidebar-brand">
             <div className="wordmark">StudyQuest</div>
@@ -1273,7 +1279,7 @@ function App() {
                   <div className="upload-pick">
                     <span className="upload-generating-spinner" aria-hidden="true" />
                     <strong>Generating your video…</strong>
-                    <span>Study Quest AI is turning your file into a short clip.</span>
+                    <span>StudyQuest AI is turning your file into a short clip.</span>
                   </div>
                 ) : selectedGenerateSample ? (
                   <>
@@ -1301,7 +1307,7 @@ function App() {
                     <span className="upload-pick">
                       <FileText size={28} strokeWidth={2} />
                       <strong>Choose slides, PDFs, or notes</strong>
-                      <span>Study Quest AI turns them into a short video</span>
+                      <span>StudyQuest AI turns them into a short video</span>
                     </span>
                   </button>
                 )}
@@ -1469,7 +1475,7 @@ function App() {
                 <X size={18} strokeWidth={2.2} />
               </button>
             </header>
-            <p>Pick what you want Study Quest AI to turn into a video.</p>
+            <p>Pick what you want StudyQuest AI to turn into a video.</p>
             <ul className="upload-picker-list">
               {generateSamples.map((sample) => (
                 <li key={sample.id}>
@@ -1618,9 +1624,21 @@ function PostCard({
     video.setAttribute('webkit-playsinline', '')
 
     if (active) {
-      video.muted = !soundOnRef.current
-      void video.play().catch(() => {})
+      if (shouldDeferVideoAutoplay() && !isSessionAudioUnlocked()) {
+        video.pause()
+        video.muted = true
+      } else {
+        if (isSessionAudioUnlocked()) {
+          video.muted = false
+          soundOnRef.current = true
+          setSoundOn(true)
+        } else {
+          video.muted = !soundOnRef.current
+        }
+        void video.play().catch(() => {})
+      }
     } else {
+      video.pause()
       video.muted = true
     }
 
@@ -1632,25 +1650,43 @@ function PostCard({
     }
   }, [active, post.modality, post.video, completed])
 
+  const startPlaybackWithSound = () => {
+    const video = videoRef.current
+    if (!video) return
+
+    primeVideoForSound(video)
+    soundOnRef.current = true
+    setSoundOn(true)
+    void video.play().catch(() => {})
+  }
+
   const unlockSound = () => {
     const video = videoRef.current
     if (!video) return
 
-    const time = video.currentTime
-    video.pause()
-    video.muted = false
-    video.removeAttribute('muted')
-    video.defaultMuted = false
-    video.volume = 1
-    video.currentTime = time
+    primeVideoForSound(video)
     soundOnRef.current = true
     setSoundOn(true)
+
+    if (video.paused) {
+      void video.play().catch(() => {})
+      return
+    }
+
+    const time = video.currentTime
+    video.pause()
+    video.currentTime = time
     void video.play().catch(() => {})
   }
 
   const handleVideoControl = () => {
     const video = videoRef.current
     if (!video) return
+
+    if (shouldDeferVideoAutoplay() && (video.paused || !soundOnRef.current)) {
+      startPlaybackWithSound()
+      return
+    }
 
     if (video.muted || !soundOnRef.current) {
       unlockSound()
@@ -1820,8 +1856,8 @@ function PostCard({
               <div className="post-credit-tip">
                 {post.modality === 'video' && (
                   <p>
-                    {post.postedBy === 'Study Quest AI'
-                      ? 'Study Quest AI generated'
+                    {post.postedBy === 'StudyQuest AI'
+                      ? 'StudyQuest AI generated'
                       : `${post.postedBy ?? PROFILE_NAME} posted`}
                   </p>
                 )}
@@ -1829,7 +1865,7 @@ function PostCard({
                   Source:{' '}
                   {post.generatedFrom ? (
                     post.generatedFrom
-                  ) : !post.postedBy || post.postedBy === 'Study Quest AI' ? (
+                  ) : !post.postedBy || post.postedBy === 'StudyQuest AI' ? (
                     <a href={sourceUrl} target="_blank" rel="noreferrer">
                       {sourceProvider}
                     </a>
@@ -1852,13 +1888,12 @@ function PostCard({
                 loop={false}
                 preload="auto"
                 onEnded={finishVideo}
-                onPointerDown={handleVideoControl}
+                onClick={handleVideoControl}
               />
               <button
                 type="button"
                 className={`video-play-toggle ${playing ? 'playing' : ''}${playing && !soundOn ? ' playing-muted' : ''}`}
-                onPointerDown={(event) => {
-                  event.preventDefault()
+                onClick={(event) => {
                   event.stopPropagation()
                   handleVideoControl()
                 }}
@@ -1882,7 +1917,12 @@ function PostCard({
                 tabIndex={0}
                 onPointerDown={(event) => {
                   scrubbingRef.current = true
-                  if (!soundOnRef.current) unlockSound()
+                  const video = videoRef.current
+                  if (video && !soundOnRef.current) {
+                    primeVideoForSound(video)
+                    soundOnRef.current = true
+                    setSoundOn(true)
+                  }
                   event.currentTarget.setPointerCapture(event.pointerId)
                   seekToRatio(ratioFromEvent(event))
                 }}
