@@ -343,6 +343,14 @@ function writeSession(signedIn: boolean, provider: Provider | null) {
   localStorage.setItem(SESSION_KEY, JSON.stringify({ signedIn: true, provider }))
 }
 
+function clearProgressStorage() {
+  localStorage.removeItem(PROGRESS_KEY)
+  localStorage.removeItem(ANSWERED_KEY)
+  localStorage.removeItem(QUIZ_RESPONSES_KEY)
+  localStorage.removeItem(FEED_POSITION_KEY)
+  localStorage.removeItem(LAST_FEED_CLASS_KEY)
+}
+
 function readSavedIds(): number[] {
   try {
     const raw = localStorage.getItem(SAVED_KEY)
@@ -688,10 +696,24 @@ function App() {
   }
 
   const logOut = () => {
+    clearProgressStorage()
     writeSession(false, null)
     setProvider(null)
+    setCompletedIds([])
+    setAnsweredIds([])
+    setQuizResponses({})
+    setFeedPositions({})
+    setTopicStatus({})
+    setTopicCorrectStreak({})
+    setAssignmentOpened(false)
+    setAssignmentSnoozed(false)
+    setActiveIndex(0)
+    setSelectedClass('All')
+    setCommentsOpen(false)
+    setShowAllDues(false)
     setMainView('feed')
     setScreen('auth')
+    restoreFeedRef.current = true
   }
 
   const uploadReady =
