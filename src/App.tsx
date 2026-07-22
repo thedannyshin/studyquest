@@ -664,11 +664,17 @@ function App() {
     assignmentReady &&
     (selectedClass === 'All' || selectedClass === assignment.classCode)
 
+  const allPostsComplete = useMemo(() => {
+    if (visiblePosts.length === 0) return false
+    return visiblePosts.every((post) => completedIds.includes(post.id))
+  }, [visiblePosts, completedIds])
+
   const feedItems = useMemo(() => {
     const items: Array<
       | { type: 'due'; items: (typeof upcomingItems)[number][] }
       | { type: 'assignment' }
       | { type: 'post'; post: Post }
+      | { type: 'complete' }
     > = []
     const dueAfter = Math.min(2, visiblePosts.length)
     const head = visiblePosts.slice(0, dueAfter)
@@ -678,8 +684,9 @@ function App() {
     if (visibleDues.length > 0) items.push({ type: 'due', items: visibleDues })
     if (showAssignmentCard) items.push({ type: 'assignment' })
     tail.forEach((post) => items.push({ type: 'post', post }))
+    if (allPostsComplete) items.push({ type: 'complete' })
     return items
-  }, [visibleDues, showAssignmentCard, visiblePosts])
+  }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete])
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: 0 })
@@ -922,14 +929,16 @@ function App() {
                   ? item.post.id
                   : item.type === 'due'
                     ? 'due-board'
-                    : `assignment-${index}`
+                    : item.type === 'complete'
+                      ? 'feed-complete'
+                      : `assignment-${index}`
               }
             >
               {item.type === 'due' ? (
                 <div className="tiktok-row">
                   <article className="post-frame due">
                     <div className="due-panel">
-                      <h2>From your {providerLabel}</h2>
+                      <h2>Due soon on {providerLabel}</h2>
                       <ul className="due-list">
                         {(showAllDues
                           ? [...upcomingItems].sort((a, b) => a.dueOffset - b.dueOffset)
@@ -996,6 +1005,33 @@ function App() {
                           Keep practicing
                         </button>
                       </div>
+                    </div>
+                  </article>
+                </div>
+              ) : item.type === 'complete' ? (
+                <div className="tiktok-row">
+                  <article className="post-frame complete">
+                    <div className="complete-content">
+                      <span className="complete-badge" aria-hidden="true">
+                        <Check size={28} strokeWidth={2.5} />
+                      </span>
+                      <h2>
+                        {selectedClass === 'All'
+                          ? "You're all caught up"
+                          : `${selectedClass} complete`}
+                      </h2>
+                      <p>Nice work finishing everything here.</p>
+                      {selectedClass !== 'All' && (
+                        <div className="lesson-actions">
+                          <button
+                            type="button"
+                            className="lesson-primary"
+                            onClick={() => openFeedClass('All')}
+                          >
+                            Back to feed
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </article>
                 </div>
@@ -1596,24 +1632,6 @@ function PostCard({
     if (isCorrect) setCompleted(true)
   }
 
-  const redo = () => {
-    recordedRef.current = false
-    setAutoNextArmed(false)
-    setCompleted(false)
-    setSubmitted(false)
-    setAnswer('')
-    setProgress(0)
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0
-      videoRef.current.play().catch(() => {})
-    }
-  }
-
-  const goNext = () => {
-    setAutoNextArmed(false)
-    onNext()
-  }
-
   const addComment = (event: FormEvent) => {
     event.preventDefault()
     const text = comment.trim()
@@ -1701,7 +1719,7 @@ function PostCard({
   return (
     <>
       <div className="tiktok-row">
-        <article className={`post-frame ${post.modality}${completed ? ' done' : ''}`} id={`lesson-${post.id}`}>
+        <article className={`post-frame ${post.modality}`} id={`lesson-${post.id}`}>
           {post.privacy === 'only-me' && (
             <span className="post-privacy">Only you</span>
           )}
@@ -1746,30 +1764,7 @@ function PostCard({
             )}
           </div>
 
-          {completed && post.modality === 'video' ? (
-            <div className="video-end">
-              <button type="button" className="video-end-secondary" onClick={redo}>
-                Watch again
-              </button>
-              {hasNext && (
-                <button type="button" className="video-end-primary" onClick={goNext}>
-                  {autoNextArmed && <span className="video-end-progress" aria-hidden="true" />}
-                  <span className="video-end-label">Next</span>
-                </button>
-              )}
-            </div>
-          ) : completed ? (
-            <div className="lesson-completed">
-              <span className="completed-badge" aria-hidden="true">
-                <Check size={28} strokeWidth={2.5} />
-              </span>
-              <h2>Completed</h2>
-              <p>Nice work. Replay anytime to practice again.</p>
-              <button type="button" className="completed-action" onClick={redo}>
-                Do it again
-              </button>
-            </div>
-          ) : post.modality === 'video' && post.video ? (
+          {post.modality === 'video' && post.video ? (
             <div className="lesson-media">
               <video
                 ref={videoRef}

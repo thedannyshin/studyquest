@@ -783,12 +783,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   color: #f2f2f2;
   border: 1px solid #333;
 }
-.post-frame.due {
-  background: #111;
-  color: #fff;
-  border: 0;
-}
-.post-frame.done {
+.post-frame.due,
+.post-frame.complete {
   background: #111;
   color: #fff;
   border: 0;
@@ -1256,57 +1252,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   opacity: .35;
   cursor: default;
 }
-.video-end {
+.assignment-content {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  align-content: center;
   gap: 12px;
-  padding: 24px;
-  background: rgba(0,0,0,.72);
+  padding: 28px 22px;
 }
-.video-end-primary,
-.video-end-secondary {
-  width: min(100%, 220px);
-  height: 44px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.video-end-primary {
-  position: relative;
-  overflow: hidden;
-  border: 0;
-  background: #f2f2f2;
-  color: #0a0a0a;
-}
-.video-end-progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: #0a0a0a;
-  transform: scaleX(0);
-  transform-origin: left center;
-  animation: video-end-fill 3s linear forwards;
-}
-.video-end-label {
-  position: relative;
-  z-index: 1;
-}
-@keyframes video-end-fill {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-.video-end-secondary {
-  border: 1px solid rgba(255,255,255,.45);
-  background: transparent;
-  color: #fff;
-}
-.lesson-completed {
+.complete-content {
   height: 100%;
   display: grid;
   place-content: center;
@@ -1315,7 +1268,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   gap: 10px;
   padding: 28px 24px;
 }
-.completed-badge {
+.complete-badge {
   width: 72px;
   height: 72px;
   margin-bottom: 8px;
@@ -1325,40 +1278,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   display: grid;
   place-items: center;
 }
-.lesson-completed h2 {
+.complete-content h2 {
   margin: 0;
   font-family: 'Manrope', sans-serif;
   font-size: 28px;
   letter-spacing: -.8px;
   font-weight: 800;
 }
-.lesson-completed p {
-  margin: 0 0 10px;
-  max-width: 220px;
+.complete-content p {
+  margin: 0;
+  max-width: 240px;
   color: rgba(255,255,255,.7);
   font-size: 14px;
   line-height: 1.45;
 }
-.completed-action {
-  height: 44px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: 999px;
-  background: #f2f2f2;
-  color: #0a0a0a;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.completed-action:hover {
-  background: #fff;
-}
-.assignment-content {
-  height: 100%;
-  display: grid;
-  align-content: center;
-  gap: 12px;
-  padding: 28px 22px;
+.complete-content .lesson-actions {
+  margin-top: 8px;
 }
 .assignment-content h2 {
   margin: 0;
