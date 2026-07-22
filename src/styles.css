@@ -898,6 +898,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   background: #000;
   cursor: pointer;
 }
+.lesson-media.native-controls video {
+  object-fit: cover;
+}
+.lesson-media.native-controls .video-play-toggle,
+.lesson-media.native-controls .video-timeline {
+  display: none;
+}
 .video-play-toggle {
   position: absolute;
   inset: 0;
