@@ -7,8 +7,8 @@
   background: #0a0a0a;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --accent: #6bbdb5;
-  --accent-hover: #7fccc4;
+  --accent: #72e1d6;
+  --accent-hover: #8ae8df;
   --accent-ink: #0a0a0a;
 }
 
@@ -1204,6 +1204,25 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     0 1px 2px rgba(0, 0, 0, 0.18),
     0 4px 14px rgba(0, 0, 0, 0.22);
 }
+.class-avatar {
+  border-radius: 50%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: #1a1a1a;
+  color: #f2f2f2;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.class-avatar-sm {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+}
 .post-frame.assignment .action-icon {
   background: #2a2a2a;
   color: #f2f2f2;
@@ -1219,13 +1238,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     0 4px 16px rgba(255, 255, 255, 0.1);
 }
 .action-icon.class-avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   background: #1a1a1a;
   color: #f2f2f2;
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.2),
     0 4px 14px rgba(0, 0, 0, 0.28);
 }
-.post-frame.assignment .action-icon.class-avatar {
+.post-frame.assignment .action-icon.class-avatar,
+.post-frame.assignment .class-avatar {
   background: #2a2a2a;
   color: #f2f2f2;
 }
@@ -1964,6 +1988,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   .action-icon {
     width: 44px;
     height: 44px;
+    border-radius: 50%;
+  }
+  .action-icon.class-avatar {
+    min-width: 44px;
+    min-height: 44px;
   }
   .action-btn {
     touch-action: manipulation;

@@ -1384,7 +1384,9 @@ function App() {
                   <button type="button" onClick={() => openFeedClass(item.id)}>
                     <span className="progress-class-top">
                       <span className="progress-class-name">
-                        <item.Icon size={18} strokeWidth={2} />
+                        <span className="class-avatar class-avatar-sm" aria-hidden="true">
+                          <item.Icon size={16} strokeWidth={2.2} />
+                        </span>
                         <strong>{item.label}</strong>
                       </span>
                       <span className={`progress-status ${item.done === item.total && item.total > 0 ? 'done' : ''}`}>
