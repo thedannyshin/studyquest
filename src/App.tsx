@@ -69,33 +69,115 @@ type GenerateSample = {
   materialLabel: string
   materialType: string
   classCode: string
+  file: string
   video: string
 }
 
+const generateVideos = [
+  '/How_System_Structure_Drives_Behavior_2.mp4',
+  '/How_Mental_Models_Automate_Decisions_2.mp4',
+  '/How_to_Reframe_Artificial_Constraints_2.mp4',
+] as const
+
 const generateSamples: GenerateSample[] = [
   {
-    id: 'systems-structure-deeper',
-    title: 'System structure: what to redesign',
-    materialLabel: 'Thinking in Systems + Iceberg Model',
+    id: 'lecture-1-27',
+    title: 'Systems Design: week of Jan 27',
+    materialLabel: '1/27 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
-    video: '/How_System_Structure_Drives_Behavior_2.mp4',
+    file: '/materials/1_27_Systems_Design.pdf',
+    video: generateVideos[0],
   },
   {
-    id: 'systems-mental-models-deeper',
-    title: 'Mental models in everyday decisions',
-    materialLabel: 'Mental Models and Cluster Maps',
-    materialType: 'Slides',
-    classCode: 'Systems',
-    video: '/How_Mental_Models_Automate_Decisions_2.mp4',
-  },
-  {
-    id: 'systems-constraints-deeper',
-    title: 'Turning constraints into leverage',
-    materialLabel: 'Leverage Points and Action to Outcome Maps',
+    id: 'lecture-2-3',
+    title: 'Systems Design: week of Feb 3',
+    materialLabel: '2/3 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
-    video: '/How_to_Reframe_Artificial_Constraints_2.mp4',
+    file: '/materials/2_3_Systems_Design.pdf',
+    video: generateVideos[1],
+  },
+  {
+    id: 'lecture-2-10',
+    title: 'Systems Design: week of Feb 10',
+    materialLabel: '2/10 Systems Design',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/2_10_Systems_Design.pdf',
+    video: generateVideos[2],
+  },
+  {
+    id: 'lecture-2-17',
+    title: 'Systems Design: week of Feb 17',
+    materialLabel: '2/17 Systems Design',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/2_17_Systems_Design.pdf',
+    video: generateVideos[0],
+  },
+  {
+    id: 'lecture-3-3',
+    title: 'Systems Design: week of Mar 3',
+    materialLabel: '3/3 Systems Design',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/3_3_Systems_Design.pdf',
+    video: generateVideos[1],
+  },
+  {
+    id: 'lecture-3-10',
+    title: 'Systems Design: week of Mar 10',
+    materialLabel: '3/10 Systems Design',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/3_10_Systems_Design.pdf',
+    video: generateVideos[2],
+  },
+  {
+    id: 'lecture-4-21',
+    title: 'Systems Design: week of Apr 21',
+    materialLabel: '4/21 Systems Design',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/4_21_Systems_Design.pdf',
+    video: generateVideos[0],
+  },
+  {
+    id: 'rutherford-tools',
+    title: 'Tools of systems thinkers',
+    materialLabel: 'Tools of Systems Thinkers',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/Tools_of_Systems_Thinkers.pdf',
+    video: generateVideos[1],
+  },
+  {
+    id: 'bethune-closing-loop',
+    title: 'Closing the loop for designers',
+    materialLabel: 'Closing the Loop',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/Closing_the_Loop.pdf',
+    video: generateVideos[2],
+  },
+  {
+    id: 'meadows-thinking',
+    title: 'Thinking in systems',
+    materialLabel: 'Thinking in Systems (Meadows)',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/Thinking_in_Systems_Meadows.pdf',
+    video: generateVideos[0],
+  },
+  {
+    id: 'object-modeling',
+    title: 'Object modeling and flow diagramming',
+    materialLabel: 'Object Modeling and Flow Diagramming',
+    materialType: 'PDF',
+    classCode: 'Systems',
+    file: '/materials/Object_Modeling_and_Flow_Diagramming.pdf',
+    video: generateVideos[1],
   },
 ]
 
