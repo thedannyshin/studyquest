@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import {
   isMobileStudyDevice,
   isSessionAudioUnlocked,
+  markSessionAudioUnlocked,
   primeVideoForSound,
   shouldDeferVideoAutoplay,
 } from './videoAudio'
@@ -1375,7 +1376,10 @@ function App() {
             type="button"
             className={studyMode === 'passive' ? 'active' : ''}
             aria-pressed={studyMode === 'passive'}
-            onClick={() => setStudyMode('passive')}
+            onClick={() => {
+              markSessionAudioUnlocked()
+              setStudyMode('passive')
+            }}
           >
             <Headphones size={14} strokeWidth={2.2} />
             Passive
@@ -2348,18 +2352,12 @@ function PostCard({
     video.setAttribute('playsinline', '')
     video.setAttribute('webkit-playsinline', '')
 
-    if (touchControls) {
-      if (passive && isSessionAudioUnlocked()) {
-        primeVideoForSound(video)
-        soundOnRef.current = true
-        setSoundOn(true)
-      } else {
-        video.muted = !soundOnRef.current
-      }
-    } else {
+    if (passive || !touchControls) {
       primeVideoForSound(video)
       soundOnRef.current = true
       setSoundOn(true)
+    } else {
+      video.muted = !soundOnRef.current
     }
 
     void video.play().then(() => {
@@ -2367,8 +2365,17 @@ function PostCard({
         stop()
         return
       }
+      if (passive && video.muted) {
+        primeVideoForSound(video)
+        soundOnRef.current = true
+        setSoundOn(true)
+      }
       if (!video.paused) hideControlsAfterDelay()
-    }).catch(() => {})
+    }).catch(() => {
+      if (!passive) return
+      // Autoplay with sound blocked until the next tap.
+      setPlaying(false)
+    })
 
     return () => {
       cancelled = true
@@ -2412,6 +2419,15 @@ function PostCard({
   const handleVideoControl = () => {
     const video = videoRef.current
     if (!video || !activeRef.current) return
+
+    if (passive) {
+      if (video.paused) {
+        unlockSound()
+        return
+      }
+      video.pause()
+      return
+    }
 
     if (playing && !controlsVisible) {
       showControls()
@@ -2646,15 +2662,10 @@ function PostCard({
               />
               {passive ? (
                 <div className="passive-player">
-                  <div className={`passive-cover${playing ? ' is-playing' : ''}`} aria-hidden="true">
-                    <Headphones size={52} strokeWidth={1.6} />
-                  </div>
                   <div className="passive-meta">
                     <p className="passive-kicker">{post.classCode}</p>
                     <h2>{post.title}</h2>
-                    <p className="passive-hint">
-                      {playing && !soundOn ? 'Tap play to unmute' : playing ? 'Now playing' : 'Ready to listen'}
-                    </p>
+                    <p className="passive-hint">{playing ? 'Now playing' : 'Tap play to listen'}</p>
                   </div>
                   <div
                     className="passive-scrubber"
@@ -2697,11 +2708,9 @@ function PostCard({
                       type="button"
                       className="passive-play-btn"
                       onClick={handleVideoControl}
-                      aria-label={playing && !soundOn ? 'Unmute' : playing ? 'Pause' : 'Play'}
+                      aria-label={playing ? 'Pause' : 'Play'}
                     >
-                      {playing && !soundOn ? (
-                        <VolumeX size={30} strokeWidth={2.2} />
-                      ) : playing ? (
+                      {playing ? (
                         <Pause size={30} fill="currentColor" />
                       ) : (
                         <Play size={30} fill="currentColor" />
