@@ -10,6 +10,7 @@ import {
   canListenForQuiz,
   canSpeakQuiz,
   getVoiceSession,
+  isIOSDevice,
   speakQuiz,
   speakQuizFromGesture,
   speakText,
