@@ -36,7 +36,6 @@ import {
   Link,
   Menu,
   MessageCircle,
-  Mic,
   Network,
   Pause,
   PenTool,
@@ -1644,25 +1643,23 @@ function App() {
                   <article className="post-frame enable-session is-passive">
                     <div className="enable-session-content">
                       <p className="enable-session-kicker">Passive mode</p>
-                      <h2>Enable sound &amp; mic</h2>
+                      <h2>Almost ready</h2>
                       <p>
-                        Tap play once so lessons can autoplay and quizzes can listen for your answers.
+                        Allow sound and the microphone once so lessons can autoplay and quizzes can hear your answers.
                       </p>
-                      <div className="enable-session-icons" aria-hidden="true">
-                        <span><Headphones size={18} strokeWidth={2.2} /> Sound</span>
-                        <span><Mic size={18} strokeWidth={2.2} /> Microphone</span>
-                      </div>
                       <button
                         type="button"
-                        className="passive-play-btn enable-session-play"
+                        className="enable-session-btn"
                         onClick={() => { void enableSessionMedia() }}
                         disabled={mediaEnabling}
-                        aria-label="Enable sound and microphone"
                       >
                         {mediaEnabling ? (
-                          <Loader2 size={30} className="passive-start-spinner" />
+                          <>
+                            <Loader2 size={18} className="passive-start-spinner" />
+                            Enabling…
+                          </>
                         ) : (
-                          <Play size={30} fill="currentColor" />
+                          'Enable sound and mic'
                         )}
                       </button>
                     </div>

@@ -1908,25 +1908,28 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   font-size: 15px;
   line-height: 1.45;
 }
-.enable-session-icons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  margin: 4px 0 8px;
-  color: #cfcfcf;
-  font-size: 13px;
-  font-weight: 600;
-}
-.enable-session-icons span {
+.enable-session-btn {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: #f2f2f2;
+  color: #111;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 10px;
+  -webkit-tap-highlight-color: transparent;
 }
-.enable-session-play {
-  margin-top: 12px;
-  justify-self: center;
-  width: 100%;
-  max-width: 88px;
+.enable-session-btn:disabled {
+  opacity: 0.8;
+  cursor: default;
+}
+.enable-session-btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .assignment-content {
   height: 100%;
