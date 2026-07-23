@@ -2,7 +2,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   isMobileStudyDevice,
-  isSessionAudioUnlocked,
   markSessionAudioUnlocked,
   primeVideoForSound,
   shouldDeferVideoAutoplay,
