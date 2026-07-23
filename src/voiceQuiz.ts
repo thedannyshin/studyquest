@@ -64,6 +64,12 @@ export function getVoiceSession() {
   return voiceSession
 }
 
+/** Mark session ready for autoplay after Passive / video unlock. */
+export function ensureQuizAudioReady() {
+  unlocked = true
+  if (typeof document !== 'undefined') getSharedAudio()
+}
+
 export function isAudioSessionUnlocked() {
   return unlocked
 }
@@ -268,6 +274,12 @@ export async function speakText(text: string) {
   }
 }
 
+/** Prefetch quiz MP3s so autoplay isn't racing the network. */
+export function prefetchQuizAudio(question: string, options: string[]) {
+  const parts = buildQuizSpeechParts(question, options)
+  void Promise.all(parts.map((part) => resolveClipUrl(part)))
+}
+
 function chunkSpeech(text: string, maxLen = 160) {
   const parts = text
     .split(/(?<=[.!?])\s+|\n+/)
@@ -305,10 +317,20 @@ export async function speakQuiz(question: string, options: string[]) {
   const parts = buildQuizSpeechParts(question, options)
   const token = speakToken
   pauseFeedVideos()
-  for (const part of parts) {
-    if (token !== speakToken) return
-    await playAudioClip(part)
+
+  // Resolve every clip to a local blob/file URL first, then play in order.
+  const urls = await Promise.all(parts.map((part) => resolveClipUrl(part)))
+  if (token !== speakToken) return false
+
+  let played = false
+  for (const src of urls) {
+    if (token !== speakToken) return played
+    if (!src) continue
+    const ok = await playSrc(src, token)
+    if (ok) played = true
+    else if (!played) return false
   }
+  return played
 }
 
 /**

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   isMobileStudyDevice,
+  isSessionAudioUnlocked,
   markSessionAudioUnlocked,
   primeVideoForSound,
   shouldDeferVideoAutoplay,
@@ -9,8 +10,10 @@ import {
 import {
   canListenForQuiz,
   canSpeakQuiz,
+  ensureQuizAudioReady,
   getVoiceSession,
-  isIOSDevice,
+  isAudioSessionUnlocked,
+  prefetchQuizAudio,
   speakQuiz,
   speakQuizFromGesture,
   speakText,
@@ -2318,12 +2321,10 @@ function PostCard({
 
   useEffect(() => {
     if (!passive || post.modality !== 'drill' || !quiz || quiz.type !== 'multiple-choice') {
-      stopSpeaking()
       setVoiceStatus('idle')
       return
     }
     if (!active || displaySubmitted || !quiz.options?.length) {
-      stopSpeaking()
       setVoiceStatus('idle')
       return
     }
@@ -2333,22 +2334,31 @@ function PostCard({
     let started = false
     const sessionAtStart = getVoiceSession()
 
+    // Warm MP3s while the slide settles (same idea as video preload).
+    prefetchQuizAudio(quiz.question, quiz.options)
+
     const run = async () => {
       if (!canSpeakQuiz() && !canListenForQuiz()) {
         setVoiceStatus('unsupported')
         return
       }
 
-      // iOS Safari blocks audio outside a tap — wait for Hear question.
-      if (isIOSDevice()) {
+      // Wait until Passive (or video) unlocked audio — same gate as other media.
+      if (!isAudioSessionUnlocked() && !isSessionAudioUnlocked()) {
         setVoiceStatus('idle')
         return
       }
 
+      ensureQuizAudioReady()
       started = true
       setVoiceStatus('speaking')
-      await speakQuiz(quiz.question, quiz.options ?? [])
+      const played = await speakQuiz(quiz.question, quiz.options ?? [])
       if (cancelled || !activeRef.current || sessionAtStart !== getVoiceSession()) return
+
+      if (!played) {
+        setVoiceStatus('idle')
+        return
+      }
 
       if (!canListenForQuiz()) {
         setVoiceStatus('unsupported')
@@ -2373,12 +2383,13 @@ function PostCard({
     // Debounce so scroll settling / Strict Mode remounts don't cancel mid-speak.
     const startTimer = window.setTimeout(() => {
       if (!cancelled) void run()
-    }, 700)
+    }, 500)
 
     return () => {
       cancelled = true
       window.clearTimeout(startTimer)
       stopListening?.()
+      // Only the card that started playback may stop the shared audio element.
       if (started) stopSpeaking()
       setVoiceStatus((current) => (current === 'listening' || current === 'speaking' ? 'idle' : current))
     }
@@ -2900,7 +2911,7 @@ function PostCard({
                           ? 'Listening… say A, B, C, or D'
                           : voiceStatus === 'unsupported'
                             ? 'Voice unavailable — tap an answer'
-                            : 'Tap Hear question'}
+                            : 'Starting…'}
                   </p>
                   {!displaySubmitted && canSpeakQuiz() && (
                     <button
