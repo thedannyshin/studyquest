@@ -1025,6 +1025,23 @@ function App() {
     const slides = Array.from(root.querySelectorAll<HTMLElement>('.feed-slide'))
     if (slides.length === 0) return
 
+    const syncActiveFromScroll = () => {
+      const rootRect = root.getBoundingClientRect()
+      const midpoint = rootRect.top + rootRect.height / 2
+      let bestIndex = 0
+      let bestDistance = Number.POSITIVE_INFINITY
+      slides.forEach((slide, index) => {
+        const rect = slide.getBoundingClientRect()
+        const slideMid = rect.top + rect.height / 2
+        const distance = Math.abs(slideMid - midpoint)
+        if (distance < bestDistance) {
+          bestDistance = distance
+          bestIndex = index
+        }
+      })
+      setActiveIndex((current) => (current === bestIndex ? current : bestIndex))
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -1032,14 +1049,33 @@ function App() {
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
         if (!visible) return
         const index = slides.indexOf(visible.target as HTMLElement)
-        if (index >= 0) setActiveIndex(index)
+        if (index >= 0) setActiveIndex((current) => (current === index ? current : index))
       },
-      { root, threshold: [0.55, 0.75] },
+      { root, threshold: [0.35, 0.55, 0.75] },
     )
 
     slides.forEach((slide) => observer.observe(slide))
-    return () => observer.disconnect()
+    root.addEventListener('scroll', syncActiveFromScroll, { passive: true })
+    syncActiveFromScroll()
+    return () => {
+      observer.disconnect()
+      root.removeEventListener('scroll', syncActiveFromScroll)
+    }
   }, [visibleFeedItems.length, selectedClass, screen])
+
+  useEffect(() => {
+    if (screen !== 'feed') return
+    const root = feedRef.current
+    if (!root) return
+    const slides = root.querySelectorAll<HTMLElement>('.feed-slide')
+    slides.forEach((slide, index) => {
+      if (index === activeIndex) return
+      slide.querySelectorAll('video').forEach((video) => {
+        video.pause()
+        video.muted = true
+      })
+    })
+  }, [activeIndex, screen, visibleFeedItems.length])
 
   const scrollFeed = (direction: -1 | 1) => {
     const next = Math.min(Math.max(activeIndex + direction, 0), Math.max(visibleFeedItems.length - 1, 0))
@@ -1940,6 +1976,7 @@ function PostCard({
       setAutoNextArmed(false)
       setSoundOn(false)
       soundOnRef.current = false
+      setPlaying(false)
       setControlsVisible(true)
       window.clearTimeout(controlsTimerRef.current)
       const video = videoRef.current
@@ -1972,17 +2009,31 @@ function PostCard({
   }, [active, completed, autoNextArmed, hasNext, post.modality, post.id])
 
   useEffect(() => {
-    if (post.modality !== 'video' || completed) return
+    if (post.modality !== 'video') return
     const video = videoRef.current
     if (!video) return
 
-    if (!active) {
+    let cancelled = false
+
+    const stop = () => {
       video.pause()
       video.muted = true
-      return
+      setPlaying(false)
+    }
+
+    if (!active || completed) {
+      stop()
+      return () => {
+        cancelled = true
+        stop()
+      }
     }
 
     const onPlay = () => {
+      if (cancelled || !activeRef.current) {
+        stop()
+        return
+      }
       setPlaying(true)
       hideControlsAfterDelay()
     }
@@ -2014,18 +2065,18 @@ function PostCard({
       soundOnRef.current = true
       setSoundOn(true)
     }
+
     void video.play().then(() => {
-      if (!activeRef.current) {
-        video.pause()
-        video.muted = true
+      if (cancelled || !activeRef.current) {
+        stop()
         return
       }
       if (!video.paused) hideControlsAfterDelay()
     }).catch(() => {})
 
     return () => {
-      video.pause()
-      video.muted = true
+      cancelled = true
+      stop()
       video.removeEventListener('play', onPlay)
       video.removeEventListener('pause', onPause)
       video.removeEventListener('timeupdate', onTimeUpdate)
@@ -2033,36 +2084,38 @@ function PostCard({
     }
   }, [active, post.modality, post.video, completed, touchControls])
 
-  useEffect(() => {
-    if (post.modality !== 'video' || active) return
-    const video = videoRef.current
-    if (!video) return
-    video.pause()
-    video.muted = true
-  }, [active, post.modality])
-
   const unlockSound = () => {
     const video = videoRef.current
-    if (!video) return
+    if (!video || !activeRef.current) return
 
     primeVideoForSound(video)
     soundOnRef.current = true
     setSoundOn(true)
 
     if (video.paused) {
-      void video.play().catch(() => {})
+      void video.play().then(() => {
+        if (!activeRef.current) {
+          video.pause()
+          video.muted = true
+        }
+      }).catch(() => {})
       return
     }
 
     const time = video.currentTime
     video.pause()
     video.currentTime = time
-    void video.play().catch(() => {})
+    void video.play().then(() => {
+      if (!activeRef.current) {
+        video.pause()
+        video.muted = true
+      }
+    }).catch(() => {})
   }
 
   const handleVideoControl = () => {
     const video = videoRef.current
-    if (!video) return
+    if (!video || !activeRef.current) return
 
     if (playing && !controlsVisible) {
       showControls()
@@ -2070,7 +2123,12 @@ function PostCard({
     }
 
     if (video.paused) {
-      void video.play().catch(() => {})
+      void video.play().then(() => {
+        if (!activeRef.current) {
+          video.pause()
+          video.muted = true
+        }
+      }).catch(() => {})
       return
     }
 
