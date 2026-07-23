@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  isMobileStudyDevice,
+  isSessionAudioUnlocked,
   primeVideoForSound,
   shouldDeferVideoAutoplay,
 } from './videoAudio'
@@ -12,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Headphones,
   Home,
   Info,
   Link,
@@ -63,6 +66,7 @@ type Post = {
 
 type UploadPrivacy = 'classmates' | 'only-me'
 type UploadMode = 'video' | 'generate'
+type StudyMode = 'active' | 'passive'
 
 type GenerateSample = {
   id: string
@@ -442,6 +446,7 @@ const SAVED_KEY = 'study-quest-saved'
 const PROGRESS_KEY = 'study-quest-progress'
 const ANSWERED_KEY = 'study-quest-answered'
 const QUIZ_RESPONSES_KEY = 'study-quest-quiz-responses'
+const STUDY_MODE_KEY = 'study-quest-study-mode'
 const FEED_POSITION_KEY = 'study-quest-feed-position'
 const LAST_FEED_CLASS_KEY = 'study-quest-feed-class'
 
@@ -587,6 +592,18 @@ function writeQuizResponses(responses: QuizResponses) {
   localStorage.setItem(QUIZ_RESPONSES_KEY, JSON.stringify(responses))
 }
 
+function readStudyMode(): StudyMode {
+  try {
+    return localStorage.getItem(STUDY_MODE_KEY) === 'passive' ? 'passive' : 'active'
+  } catch {
+    return 'active'
+  }
+}
+
+function writeStudyMode(mode: StudyMode) {
+  localStorage.setItem(STUDY_MODE_KEY, mode)
+}
+
 function mergeAnsweredIds(ids: number[], responses: QuizResponses) {
   const fromResponses = Object.keys(responses)
     .map((key) => Number(key))
@@ -667,10 +684,13 @@ function App() {
   const [uploadError, setUploadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showAllDues, setShowAllDues] = useState(false)
+  const [studyMode, setStudyMode] = useState<StudyMode>(() => readStudyMode())
+  const [mobileStudy, setMobileStudy] = useState(() => isMobileStudyDevice())
   const [feedPositions, setFeedPositions] = useState<FeedPositions>(() => readFeedPositions())
   const feedRef = useRef<HTMLElement>(null)
   const restoreFeedRef = useRef(true)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  const passiveMode = mobileStudy && studyMode === 'passive'
 
   useEffect(() => {
     if (screen === 'feed') writeSession(true, provider)
@@ -695,6 +715,29 @@ function App() {
   useEffect(() => {
     writeFeedPositions(feedPositions)
   }, [feedPositions])
+
+  useEffect(() => {
+    writeStudyMode(studyMode)
+  }, [studyMode])
+
+  useEffect(() => {
+    const syncMobile = () => setMobileStudy(isMobileStudyDevice())
+    syncMobile()
+    window.addEventListener('resize', syncMobile)
+    return () => window.removeEventListener('resize', syncMobile)
+  }, [])
+
+  useEffect(() => {
+    if (!mobileStudy && studyMode === 'passive') setStudyMode('active')
+  }, [mobileStudy, studyMode])
+
+  useEffect(() => {
+    if (passiveMode) setCommentsOpen(false)
+  }, [passiveMode])
+
+  useEffect(() => {
+    restoreFeedRef.current = true
+  }, [passiveMode])
 
   useEffect(() => {
     if (mainView !== 'upload') setUploadPickerOpen(false)
@@ -1030,9 +1073,13 @@ function App() {
       ? [...allPosts]
       : allPosts.filter((post) => post.classCode === selectedClass)
 
+    const filtered = passiveMode
+      ? list.filter((post) => !(post.modality === 'drill' && post.quiz?.type === 'fill'))
+      : list
+
     const score = (post: Post) => (topicStatus[post.topic] === 'needsWork' ? 1 : 0)
-    return list.sort((a, b) => score(b) - score(a))
-  }, [selectedClass, topicStatus, allPosts])
+    return filtered.sort((a, b) => score(b) - score(a))
+  }, [selectedClass, topicStatus, allPosts, passiveMode])
 
   const visibleDues = useMemo(() => {
     const list = selectedClass === 'All'
@@ -1294,7 +1341,7 @@ function App() {
   }
 
   return (
-    <main className={`app-shell ${commentsOpen && mainView === 'feed' ? 'comments-open' : ''}${mobileNavOpen ? ' nav-open' : ''}`}>
+    <main className={`app-shell ${commentsOpen && mainView === 'feed' ? 'comments-open' : ''}${mobileNavOpen ? ' nav-open' : ''}${passiveMode ? ' passive-mode' : ''}${mobileStudy ? ' is-mobile-study' : ''}`}>
       <button
         type="button"
         className="mobile-menu-btn"
@@ -1309,6 +1356,29 @@ function App() {
       >
         <Menu size={22} strokeWidth={2.2} />
       </button>
+
+      {mobileStudy && mainView === 'feed' && (
+        <div className="study-mode-toggle" role="group" aria-label="Study mode">
+          <button
+            type="button"
+            className={studyMode === 'active' ? 'active' : ''}
+            aria-pressed={studyMode === 'active'}
+            onClick={() => setStudyMode('active')}
+          >
+            <Video size={14} strokeWidth={2.2} />
+            Active
+          </button>
+          <button
+            type="button"
+            className={studyMode === 'passive' ? 'active' : ''}
+            aria-pressed={studyMode === 'passive'}
+            onClick={() => setStudyMode('passive')}
+          >
+            <Headphones size={14} strokeWidth={2.2} />
+            Passive
+          </button>
+        </div>
+      )}
 
       {mobileNavOpen && (
         <button
@@ -1517,6 +1587,7 @@ function App() {
                   sourceUrl={sourceUrl}
                   sourceProvider={providerLabel}
                   active={index === activeIndex}
+                  passive={passiveMode}
                   commentsOpen={commentsOpen && index === activeIndex}
                   onCommentsOpenChange={setCommentsOpen}
                   onCheck={recordCheck}
@@ -2055,6 +2126,7 @@ function PostCard({
   sourceUrl,
   sourceProvider,
   active,
+  passive,
   commentsOpen,
   onCommentsOpenChange,
   onCheck,
@@ -2072,6 +2144,7 @@ function PostCard({
   sourceUrl: string
   sourceProvider: string
   active: boolean
+  passive: boolean
   commentsOpen: boolean
   onCommentsOpenChange: (open: boolean) => void
   onCheck: (topic: string, correct: boolean) => void
@@ -2195,9 +2268,22 @@ function PostCard({
     const timer = window.setTimeout(() => {
       setAutoNextArmed(false)
       onNextRef.current()
-    }, 3000)
+    }, passive ? 900 : 3000)
     return () => window.clearTimeout(timer)
-  }, [active, completed, autoNextArmed, hasNext, post.modality, post.id])
+  }, [active, completed, autoNextArmed, hasNext, post.modality, post.id, passive])
+
+  useEffect(() => {
+    if (!passive || !active || post.modality !== 'drill' || displaySubmitted || !quiz) return
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate([18, 40, 18])
+    }
+  }, [passive, active, post.modality, post.id, displaySubmitted, quiz])
+
+  useEffect(() => {
+    if (!passive || !active || post.modality !== 'drill' || !displaySubmitted || !hasNext) return
+    const timer = window.setTimeout(() => onNextRef.current(), 1400)
+    return () => window.clearTimeout(timer)
+  }, [passive, active, post.modality, displaySubmitted, hasNext, post.id])
 
   useEffect(() => {
     if (post.modality !== 'video') return
@@ -2250,7 +2336,13 @@ function PostCard({
     video.setAttribute('webkit-playsinline', '')
 
     if (touchControls) {
-      video.muted = !soundOnRef.current
+      if (passive && isSessionAudioUnlocked()) {
+        primeVideoForSound(video)
+        soundOnRef.current = true
+        setSoundOn(true)
+      } else {
+        video.muted = !soundOnRef.current
+      }
     } else {
       primeVideoForSound(video)
       soundOnRef.current = true
@@ -2273,7 +2365,7 @@ function PostCard({
       video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('loadedmetadata', onLoaded)
     }
-  }, [active, post.modality, post.video, completed, touchControls])
+  }, [active, post.modality, post.video, completed, touchControls, passive])
 
   const unlockSound = () => {
     const video = videoRef.current
@@ -2430,7 +2522,7 @@ function PostCard({
               )
             })}
           </div>
-        ) : (
+        ) : passive ? null : (
           <>
             <div className={`fill-field ${displaySubmitted ? (displayCorrect ? 'correct' : 'wrong') : ''}`}>
               <input
@@ -2482,46 +2574,48 @@ function PostCard({
   return (
     <>
       <div className="tiktok-row">
-        <article className={`post-frame ${post.modality}`} id={`lesson-${post.id}`}>
+        <article className={`post-frame ${post.modality}${passive ? ' is-passive' : ''}`} id={`lesson-${post.id}`}>
           {post.privacy === 'only-me' && (
             <span className="post-privacy">Only you</span>
           )}
 
-          <div className={`post-credit ${creditOpen ? 'open' : ''}`}>
-            <button
-              type="button"
-              className="post-credit-btn"
-              aria-label="Post info"
-              aria-expanded={creditOpen}
-              onClick={() => {
-                setClassOpen(false)
-                setCreditOpen((open) => !open)
-              }}
-            >
-              <Info size={18} strokeWidth={2.2} />
-            </button>
-            {creditOpen && (
-              <div className="post-credit-tip">
-                {post.modality === 'video' && (
-                  <p>{getVideoAttribution(post.postedBy)}</p>
-                )}
-                <p className="post-credit-meta">
-                  Source:{' '}
-                  {post.generatedFrom ? (
-                    post.generatedFrom
-                  ) : !post.postedBy || post.postedBy === 'StudyQuest AI' ? (
-                    <a href={sourceUrl} target="_blank" rel="noreferrer">
-                      {sourceProvider}
-                    </a>
-                  ) : post.postedBy === PROFILE_NAME ? (
-                    'Your upload'
-                  ) : (
-                    post.postedBy
+          {!passive && (
+            <div className={`post-credit ${creditOpen ? 'open' : ''}`}>
+              <button
+                type="button"
+                className="post-credit-btn"
+                aria-label="Post info"
+                aria-expanded={creditOpen}
+                onClick={() => {
+                  setClassOpen(false)
+                  setCreditOpen((open) => !open)
+                }}
+              >
+                <Info size={18} strokeWidth={2.2} />
+              </button>
+              {creditOpen && (
+                <div className="post-credit-tip">
+                  {post.modality === 'video' && (
+                    <p>{getVideoAttribution(post.postedBy)}</p>
                   )}
-                </p>
-              </div>
-            )}
-          </div>
+                  <p className="post-credit-meta">
+                    Source:{' '}
+                    {post.generatedFrom ? (
+                      post.generatedFrom
+                    ) : !post.postedBy || post.postedBy === 'StudyQuest AI' ? (
+                      <a href={sourceUrl} target="_blank" rel="noreferrer">
+                        {sourceProvider}
+                      </a>
+                    ) : post.postedBy === PROFILE_NAME ? (
+                      'Your upload'
+                    ) : (
+                      post.postedBy
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {post.modality === 'video' && post.video ? (
             <div className="lesson-media">
@@ -2535,9 +2629,21 @@ function PostCard({
                 onEnded={finishVideo}
                 onClick={handleVideoControl}
               />
+              {passive ? (
+                <div className="passive-audio-stage" aria-hidden={!active}>
+                  <div className={`passive-pulse${playing ? ' is-playing' : ''}`}>
+                    <Headphones size={34} strokeWidth={1.8} />
+                  </div>
+                  <p className="passive-kicker">{post.classCode}</p>
+                  <h2>{post.title}</h2>
+                  <p className="passive-hint">
+                    {playing && !soundOn ? 'Tap to unmute' : playing ? 'Listening…' : 'Tap to play'}
+                  </p>
+                </div>
+              ) : null}
               <button
                 type="button"
-                className={`video-play-toggle${showCenterControl ? ' is-shown' : ''}${playing && !soundOn ? ' is-muted' : ''}`}
+                className={`video-play-toggle${showCenterControl || passive ? ' is-shown' : ''}${playing && !soundOn ? ' is-muted' : ''}${passive ? ' is-passive-control' : ''}`}
                 onClick={(event) => {
                   event.stopPropagation()
                   handleVideoControl()
@@ -2555,7 +2661,7 @@ function PostCard({
               <div
                 className="video-timeline"
                 role="slider"
-                aria-label="Video progress"
+                aria-label="Audio progress"
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(progress * 100)}
@@ -2586,7 +2692,10 @@ function PostCard({
               </div>
             </div>
           ) : (
-            <div className="quiz-stack">
+            <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}`}>
+              {passive && (
+                <p className="passive-quiz-ping" role="status">Quick check</p>
+              )}
               <div className="quiz-header">
                 <h2>{title}</h2>
               </div>
@@ -2594,63 +2703,65 @@ function PostCard({
             </div>
           )}
 
-          <aside className={`action-rail${quizInputActive ? ' is-hidden' : ''}`} aria-label="Post actions">
-            <div className={`action-class ${classOpen ? 'open' : ''}`}>
+          {!passive && (
+            <aside className={`action-rail${quizInputActive ? ' is-hidden' : ''}`} aria-label="Post actions">
+              <div className={`action-class ${classOpen ? 'open' : ''}`}>
+                <button
+                  type="button"
+                  className="action-btn"
+                  aria-label="Class"
+                  aria-expanded={classOpen}
+                  onClick={() => {
+                    setCreditOpen(false)
+                    setClassOpen((open) => !open)
+                  }}
+                >
+                  <span className="action-icon class-avatar">
+                    <ClassIcon size={20} strokeWidth={2.2} />
+                  </span>
+                </button>
+                {classOpen && (
+                  <div className="action-class-tip">
+                    <p>{classMeta?.label ?? post.classCode}</p>
+                  </div>
+                )}
+              </div>
+
+              {post.modality === 'video' && (
+                <button
+                  type="button"
+                  className={`action-btn ${commentsOpen ? 'active' : ''}`}
+                  onClick={() => onCommentsOpenChange(!commentsOpen)}
+                  aria-label="Comments"
+                >
+                  <span className="action-icon comment-icon"><MessageCircle size={20} /></span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                className={`action-btn ${saved ? 'active' : ''}`}
+                onClick={onToggleSave}
+                aria-label={saved ? 'Unsave' : 'Save'}
+              >
+                <span className="action-icon">
+                  <Bookmark size={20} fill={saved ? 'currentColor' : 'none'} />
+                </span>
+              </button>
+
               <button
                 type="button"
                 className="action-btn"
-                aria-label="Class"
-                aria-expanded={classOpen}
                 onClick={() => {
-                  setCreditOpen(false)
-                  setClassOpen((open) => !open)
+                  setShareCopied(false)
+                  setShareOpen(true)
                 }}
+                aria-label="Share"
               >
-                <span className="action-icon class-avatar">
-                  <ClassIcon size={20} strokeWidth={2.2} />
-                </span>
+                <span className="action-icon"><Link size={20} /></span>
               </button>
-              {classOpen && (
-                <div className="action-class-tip">
-                  <p>{classMeta?.label ?? post.classCode}</p>
-                </div>
-              )}
-            </div>
-
-            {post.modality === 'video' && (
-              <button
-                type="button"
-                className={`action-btn ${commentsOpen ? 'active' : ''}`}
-                onClick={() => onCommentsOpenChange(!commentsOpen)}
-                aria-label="Comments"
-              >
-                <span className="action-icon comment-icon"><MessageCircle size={20} /></span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              className={`action-btn ${saved ? 'active' : ''}`}
-              onClick={onToggleSave}
-              aria-label={saved ? 'Unsave' : 'Save'}
-            >
-              <span className="action-icon">
-                <Bookmark size={20} fill={saved ? 'currentColor' : 'none'} />
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className="action-btn"
-              onClick={() => {
-                setShareCopied(false)
-                setShareOpen(true)
-              }}
-              aria-label="Share"
-            >
-              <span className="action-icon"><Link size={20} /></span>
-            </button>
-          </aside>
+            </aside>
+          )}
 
           {showContinueHint && (
             <p className="post-advance-hint" role="status">

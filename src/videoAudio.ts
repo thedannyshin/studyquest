@@ -13,6 +13,11 @@ export function shouldDeferVideoAutoplay() {
   return isIOSDevice() || window.matchMedia('(pointer: coarse)').matches
 }
 
+export function isMobileStudyDevice() {
+  if (typeof window === 'undefined') return false
+  return shouldDeferVideoAutoplay() || window.matchMedia('(max-width: 720px)').matches
+}
+
 export function markSessionAudioUnlocked() {
   sessionAudioUnlocked = true
 }
