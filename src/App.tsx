@@ -15,7 +15,6 @@ import {
   isAudioSessionUnlocked,
   prefetchQuizAudio,
   speakQuiz,
-  speakQuizFromGesture,
   speakText,
   startListeningForOption,
   stopSpeaking,
@@ -2213,7 +2212,6 @@ function PostCard({
   const [classOpen, setClassOpen] = useState(false)
   const [quizInputActive, setQuizInputActive] = useState(false)
   const [autoNextArmed, setAutoNextArmed] = useState(false)
-  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'speaking' | 'listening' | 'unsupported'>('idle')
   const recordedRef = useRef(Boolean(savedQuizAnswer))
   const activeRef = useRef(active)
   const onNextRef = useRef(onNext)
@@ -2315,17 +2313,17 @@ function PostCard({
 
   useEffect(() => {
     if (!passive || !active || post.modality !== 'drill' || !displaySubmitted || !hasNext) return
+    // MCQ feedback speech handles advance after reading the result aloud.
+    if (quiz?.type === 'multiple-choice') return
     const timer = window.setTimeout(() => onNextRef.current(), 2200)
     return () => window.clearTimeout(timer)
-  }, [passive, active, post.modality, displaySubmitted, hasNext, post.id])
+  }, [passive, active, post.modality, displaySubmitted, hasNext, post.id, quiz?.type])
 
   useEffect(() => {
     if (!passive || post.modality !== 'drill' || !quiz || quiz.type !== 'multiple-choice') {
-      setVoiceStatus('idle')
       return
     }
     if (!active || displaySubmitted || !quiz.options?.length) {
-      setVoiceStatus('idle')
       return
     }
 
@@ -2338,44 +2336,21 @@ function PostCard({
     prefetchQuizAudio(quiz.question, quiz.options)
 
     const run = async () => {
-      if (!canSpeakQuiz() && !canListenForQuiz()) {
-        setVoiceStatus('unsupported')
-        return
-      }
-
+      if (!canSpeakQuiz() && !canListenForQuiz()) return
       // Wait until Passive (or video) unlocked audio — same gate as other media.
-      if (!isAudioSessionUnlocked() && !isSessionAudioUnlocked()) {
-        setVoiceStatus('idle')
-        return
-      }
+      if (!isAudioSessionUnlocked() && !isSessionAudioUnlocked()) return
 
       ensureQuizAudioReady()
       started = true
-      setVoiceStatus('speaking')
       const played = await speakQuiz(quiz.question, quiz.options ?? [])
       if (cancelled || !activeRef.current || sessionAtStart !== getVoiceSession()) return
+      if (!played || !canListenForQuiz()) return
 
-      if (!played) {
-        setVoiceStatus('idle')
-        return
-      }
-
-      if (!canListenForQuiz()) {
-        setVoiceStatus('unsupported')
-        return
-      }
-
-      setVoiceStatus('listening')
       stopListening = startListeningForOption(
         quiz.options ?? [],
         (option) => {
           if (cancelled || !activeRef.current) return
           chooseOptionRef.current(option)
-        },
-        (status) => {
-          if (cancelled) return
-          if (status === 'listening') setVoiceStatus('listening')
-          if (status === 'error') setVoiceStatus('unsupported')
         },
       )
     }
@@ -2391,39 +2366,41 @@ function PostCard({
       stopListening?.()
       // Only the card that started playback may stop the shared audio element.
       if (started) stopSpeaking()
-      setVoiceStatus((current) => (current === 'listening' || current === 'speaking' ? 'idle' : current))
     }
   }, [passive, active, post.modality, post.id, displaySubmitted, quiz])
 
-  const replayQuizSpeech = () => {
-    if (!quiz?.options?.length || displaySubmitted) return
-    setVoiceStatus('speaking')
-    // Speak inside this tap — required for iOS Safari.
-    void speakQuizFromGesture(quiz.question, quiz.options).then((session) => {
-      if (!activeRef.current || displaySubmitted || session !== getVoiceSession()) return
-      if (!canListenForQuiz()) {
-        setVoiceStatus('unsupported')
-        return
-      }
-      setVoiceStatus('listening')
-    }).catch(() => {
-      setVoiceStatus('unsupported')
-    })
-  }
-
   useEffect(() => {
     if (!passive || !active || !displaySubmitted || !quiz || quiz.type !== 'multiple-choice') return
+
+    let cancelled = false
+    const answerIndex = quiz.options?.findIndex((option) => option === quiz.answer) ?? -1
+    const letter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : null
     const line = displayCorrect
       ? 'Correct.'
-      : `Incorrect. The answer is ${quiz.answer}.`
-    const timer = window.setTimeout(() => {
-      void speakText(line)
-    }, 200)
+      : letter
+        ? `Incorrect. The correct answer is ${letter}. ${quiz.answer}.`
+        : `Incorrect. The correct answer is ${quiz.answer}.`
+
+    const run = async () => {
+      ensureQuizAudioReady()
+      await speakText(line)
+      if (cancelled || !activeRef.current) return
+      if (!hasNext) return
+      window.setTimeout(() => {
+        if (!cancelled && activeRef.current) onNextRef.current()
+      }, 450)
+    }
+
+    const startTimer = window.setTimeout(() => {
+      if (!cancelled) void run()
+    }, 180)
+
     return () => {
-      window.clearTimeout(timer)
+      cancelled = true
+      window.clearTimeout(startTimer)
       stopSpeaking()
     }
-  }, [passive, active, displaySubmitted, displayCorrect, quiz, post.id])
+  }, [passive, active, displaySubmitted, displayCorrect, quiz, post.id, hasNext])
 
   useEffect(() => {
     if (post.modality !== 'video') return
@@ -2900,30 +2877,6 @@ function PostCard({
             </div>
           ) : (
             <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}${showContinueHint ? ' has-continue-hint' : ''}`}>
-              {passive && (
-                <div className="passive-voice-bar">
-                  <p className="passive-voice-status" role="status">
-                    {displaySubmitted
-                      ? (displayCorrect ? 'Correct' : 'Incorrect')
-                      : voiceStatus === 'speaking'
-                        ? 'Playing quiz audio…'
-                        : voiceStatus === 'listening'
-                          ? 'Listening… say A, B, C, or D'
-                          : voiceStatus === 'unsupported'
-                            ? 'Voice unavailable — tap an answer'
-                            : 'Starting…'}
-                  </p>
-                  {!displaySubmitted && canSpeakQuiz() && (
-                    <button
-                      type="button"
-                      className="passive-hear-btn"
-                      onClick={replayQuizSpeech}
-                    >
-                      Hear question
-                    </button>
-                  )}
-                </div>
-              )}
               <div className="quiz-header">
                 <h2>{title}</h2>
               </div>
