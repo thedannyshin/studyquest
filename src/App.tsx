@@ -9,6 +9,7 @@ import {
 import {
   canListenForQuiz,
   canSpeakQuiz,
+  getVoiceSession,
   speakQuiz,
   speakText,
   startListeningForOption,
@@ -2329,6 +2330,7 @@ function PostCard({
     let cancelled = false
     let stopListening: (() => void) | null = null
     let started = false
+    const sessionAtStart = getVoiceSession()
 
     const run = async () => {
       if (!canSpeakQuiz() && !canListenForQuiz()) {
@@ -2339,7 +2341,7 @@ function PostCard({
       started = true
       setVoiceStatus('speaking')
       await speakQuiz(quiz.question, quiz.options ?? [])
-      if (cancelled || !activeRef.current) return
+      if (cancelled || !activeRef.current || sessionAtStart !== getVoiceSession()) return
 
       if (!canListenForQuiz()) {
         setVoiceStatus('unsupported')
@@ -2379,10 +2381,11 @@ function PostCard({
     if (!quiz?.options?.length || displaySubmitted) return
     stopSpeaking()
     unlockAudioSession()
+    const session = getVoiceSession()
     setVoiceStatus('speaking')
     // First MP3 play() happens inside this tap turn (required on iOS).
     void speakQuiz(quiz.question, quiz.options).then(() => {
-      if (!activeRef.current || displaySubmitted) return
+      if (!activeRef.current || displaySubmitted || session !== getVoiceSession()) return
       if (!canListenForQuiz()) {
         setVoiceStatus('unsupported')
         return
@@ -2399,7 +2402,7 @@ function PostCard({
       ? 'Correct.'
       : `Incorrect. The answer is ${quiz.answer}.`
     const timer = window.setTimeout(() => {
-      void speakText(line, 1.05)
+      void speakText(line)
     }, 200)
     return () => {
       window.clearTimeout(timer)

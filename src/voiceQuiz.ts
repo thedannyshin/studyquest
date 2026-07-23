@@ -35,7 +35,9 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
 }
 
 export function canSpeakQuiz() {
-  return typeof window !== 'undefined' && typeof Audio !== 'undefined'
+  return typeof window !== 'undefined' && (
+    typeof Audio !== 'undefined' || 'speechSynthesis' in window
+  )
 }
 
 export function canListenForQuiz() {
@@ -46,8 +48,13 @@ export function canListenForQuiz() {
 const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
 
 let speakToken = 0
+let voiceSession = 0
 let currentAudio: HTMLAudioElement | null = null
 let audioContext: AudioContext | null = null
+
+export function getVoiceSession() {
+  return voiceSession
+}
 
 function pauseFeedVideos() {
   if (typeof document === 'undefined') return
@@ -57,10 +64,13 @@ function pauseFeedVideos() {
   })
 }
 
+/** Google Translate TTS returns real audio/mpeg (no API key). */
 function ttsUrl(text: string) {
-  const url = new URL('https://api.streamelements.com/kappa/v2/speech')
-  url.searchParams.set('voice', 'Brian')
-  url.searchParams.set('text', text.slice(0, 280))
+  const url = new URL('https://translate.google.com/translate_tts')
+  url.searchParams.set('ie', 'UTF-8')
+  url.searchParams.set('client', 'tw-ob')
+  url.searchParams.set('tl', 'en')
+  url.searchParams.set('q', text.slice(0, 180))
   return url.toString()
 }
 
@@ -70,13 +80,52 @@ function waitForAudioEnd(audio: HTMLAudioElement, token: number) {
       resolve()
       return
     }
+
     const settle = () => {
+      window.clearInterval(poll)
       audio.removeEventListener('ended', settle)
       audio.removeEventListener('error', settle)
       resolve()
     }
+
+    const poll = window.setInterval(() => {
+      if (token !== speakToken) settle()
+    }, 80)
+
     audio.addEventListener('ended', settle)
     audio.addEventListener('error', settle)
+  })
+}
+
+function speakWithSynthesis(text: string, token: number) {
+  return new Promise<void>((resolve) => {
+    if (!('speechSynthesis' in window) || token !== speakToken) {
+      resolve()
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    const utter = new SpeechSynthesisUtterance(text)
+    utter.lang = 'en-US'
+    utter.rate = 1
+    utter.volume = 1
+
+    const poll = window.setInterval(() => {
+      if (token !== speakToken) {
+        window.clearInterval(poll)
+        window.speechSynthesis.cancel()
+        resolve()
+      }
+    }, 80)
+
+    const settle = () => {
+      window.clearInterval(poll)
+      resolve()
+    }
+
+    utter.onend = settle
+    utter.onerror = settle
+    window.speechSynthesis.speak(utter)
   })
 }
 
@@ -102,6 +151,18 @@ export function unlockAudioSession() {
   } catch {
     // ignore
   }
+
+  if ('speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel()
+      const warm = new SpeechSynthesisUtterance(' ')
+      warm.volume = 0
+      window.speechSynthesis.speak(warm)
+      window.speechSynthesis.cancel()
+    } catch {
+      // ignore
+    }
+  }
 }
 
 /** Call from Passive toggle — unlocks session and plays an audible Ready clip. */
@@ -112,6 +173,7 @@ export function unlockSpeechSynthesis() {
 
 export function stopSpeaking() {
   speakToken += 1
+  voiceSession += 1
   if (currentAudio) {
     try {
       currentAudio.pause()
@@ -121,6 +183,9 @@ export function stopSpeaking() {
       // ignore
     }
     currentAudio = null
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel()
   }
 }
 
@@ -135,13 +200,16 @@ async function playAudioClip(text: string) {
   audio.muted = false
   audio.defaultMuted = false
   audio.volume = 1
-  audio.playsInline = true
   audio.setAttribute('playsinline', 'true')
+  // Do not set crossOrigin — remote TTS hosts often omit CORS; HTMLAudio still plays.
   audio.src = ttsUrl(text)
 
   try {
     await audio.play()
   } catch {
+    if (token !== speakToken) return
+    currentAudio = null
+    await speakWithSynthesis(text, token)
     return
   }
 
@@ -151,11 +219,16 @@ async function playAudioClip(text: string) {
   }
 
   await waitForAudioEnd(audio, token)
+
+  if (token === speakToken && audio.error) {
+    currentAudio = null
+    await speakWithSynthesis(text, token)
+  }
 }
 
 export async function speakText(text: string) {
   if (!text.trim()) return
-  const chunks = chunkSpeech(text, 180)
+  const chunks = chunkSpeech(text, 160)
   const token = speakToken
   for (const chunk of chunks) {
     if (token !== speakToken) return
@@ -163,7 +236,7 @@ export async function speakText(text: string) {
   }
 }
 
-function chunkSpeech(text: string, maxLen = 180) {
+function chunkSpeech(text: string, maxLen = 160) {
   const parts = text
     .split(/(?<=[.!?])\s+|\n+/)
     .map((part) => part.trim())
