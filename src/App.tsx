@@ -2772,7 +2772,7 @@ function PostCard({
               )}
             </div>
           ) : (
-            <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}`}>
+            <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}${showContinueHint ? ' has-continue-hint' : ''}`}>
               <div className="quiz-header">
                 <h2>{title}</h2>
               </div>
@@ -2841,7 +2841,7 @@ function PostCard({
           )}
 
           {showContinueHint && (
-            <p className="post-advance-hint" role="status">
+            <p className={`post-advance-hint${passive ? ' is-passive' : ''}`} role="status">
               Answer this quiz to continue.
             </p>
           )}

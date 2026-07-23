@@ -1150,6 +1150,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.06), transparent 45%),
     #0a0a0a;
 }
+.quiz-stack.is-passive-quiz.has-continue-hint {
+  padding-bottom: calc(58px + env(safe-area-inset-bottom));
+}
 .quiz-stack.is-passive-quiz .quiz-header {
   padding-right: 0;
   flex: none;
@@ -1421,6 +1424,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   overflow-y: auto;
   box-sizing: border-box;
 }
+.quiz-stack.has-continue-hint {
+  padding-bottom: 64px;
+}
 .quiz-header {
   display: grid;
   gap: 8px;
@@ -1462,6 +1468,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
   pointer-events: none;
   animation: post-advance-hint-in 0.2s ease;
+}
+.post-advance-hint.is-passive {
+  right: 16px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
 }
 @keyframes post-advance-hint-in {
   from {
