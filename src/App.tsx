@@ -732,7 +732,10 @@ function App() {
   }, [mobileStudy, studyMode])
 
   useEffect(() => {
-    if (passiveMode) setCommentsOpen(false)
+    if (passiveMode) {
+      setCommentsOpen(false)
+      setMobileNavOpen(false)
+    }
   }, [passiveMode])
 
   useEffect(() => {
@@ -1348,7 +1351,7 @@ function App() {
         aria-label="Open menu"
         aria-expanded={mobileNavOpen}
         aria-controls="app-sidebar"
-        hidden={mobileNavOpen}
+        hidden={mobileNavOpen || passiveMode}
         onClick={() => {
           setCommentsOpen(false)
           setMobileNavOpen(true)
@@ -2121,6 +2124,13 @@ function App() {
   )
 }
 
+function formatPlayerTime(totalSeconds: number) {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '0:00'
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = Math.floor(totalSeconds % 60)
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
 function PostCard({
   post,
   sourceUrl,
@@ -2172,6 +2182,7 @@ function PostCard({
   const [soundOn, setSoundOn] = useState(false)
   const [controlsVisible, setControlsVisible] = useState(true)
   const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
   const soundOnRef = useRef(false)
   const controlsTimerRef = useRef<number>()
   const touchControls = shouldDeferVideoAutoplay()
@@ -2321,10 +2332,12 @@ function PostCard({
     }
     const onTimeUpdate = () => {
       if (scrubbingRef.current || !video.duration) return
+      setDuration(video.duration)
       setProgress(video.currentTime / video.duration)
     }
     const onLoaded = () => {
       if (!video.duration) return
+      setDuration(video.duration)
       setProgress(video.currentTime / video.duration)
     }
 
@@ -2491,6 +2504,8 @@ function PostCard({
   }
 
   const showCenterControl = !playing || controlsVisible
+  const elapsedLabel = formatPlayerTime(duration * progress)
+  const remainingLabel = `-${formatPlayerTime(Math.max(duration * (1 - progress), 0))}`
 
   const renderQuiz = () => {
     if (!quiz) return null
@@ -2618,7 +2633,7 @@ function PostCard({
           )}
 
           {post.modality === 'video' && post.video ? (
-            <div className="lesson-media">
+            <div className={`lesson-media${passive ? ' is-passive-media' : ''}`}>
               <video
                 ref={videoRef}
                 src={post.video}
@@ -2627,69 +2642,126 @@ function PostCard({
                 loop={false}
                 preload="auto"
                 onEnded={finishVideo}
-                onClick={handleVideoControl}
+                onClick={passive ? undefined : handleVideoControl}
               />
               {passive ? (
-                <div className="passive-audio-stage" aria-hidden={!active}>
-                  <div className={`passive-pulse${playing ? ' is-playing' : ''}`}>
-                    <Headphones size={34} strokeWidth={1.8} />
+                <div className="passive-player">
+                  <div className={`passive-cover${playing ? ' is-playing' : ''}`} aria-hidden="true">
+                    <Headphones size={52} strokeWidth={1.6} />
                   </div>
-                  <p className="passive-kicker">{post.classCode}</p>
-                  <h2>{post.title}</h2>
-                  <p className="passive-hint">
-                    {playing && !soundOn ? 'Tap to unmute' : playing ? 'Listening…' : 'Tap to play'}
-                  </p>
+                  <div className="passive-meta">
+                    <p className="passive-kicker">{post.classCode}</p>
+                    <h2>{post.title}</h2>
+                    <p className="passive-hint">
+                      {playing && !soundOn ? 'Tap play to unmute' : playing ? 'Now playing' : 'Ready to listen'}
+                    </p>
+                  </div>
+                  <div
+                    className="passive-scrubber"
+                    role="slider"
+                    aria-label="Audio progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(progress * 100)}
+                    tabIndex={0}
+                    onPointerDown={(event) => {
+                      scrubbingRef.current = true
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                      seekToRatio(ratioFromEvent(event))
+                    }}
+                    onPointerMove={(event) => {
+                      if (!scrubbingRef.current) return
+                      seekToRatio(ratioFromEvent(event))
+                    }}
+                    onPointerUp={() => {
+                      scrubbingRef.current = false
+                    }}
+                    onPointerCancel={() => {
+                      scrubbingRef.current = false
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowRight') seekToRatio(progress + 0.05)
+                      if (event.key === 'ArrowLeft') seekToRatio(progress - 0.05)
+                    }}
+                  >
+                    <span className="passive-scrubber-track">
+                      <span className="passive-scrubber-fill" style={{ width: `${progress * 100}%` }} />
+                    </span>
+                    <span className="passive-times">
+                      <span>{elapsedLabel}</span>
+                      <span>{remainingLabel}</span>
+                    </span>
+                  </div>
+                  <div className="passive-controls">
+                    <button
+                      type="button"
+                      className="passive-play-btn"
+                      onClick={handleVideoControl}
+                      aria-label={playing && !soundOn ? 'Unmute' : playing ? 'Pause' : 'Play'}
+                    >
+                      {playing && !soundOn ? (
+                        <VolumeX size={30} strokeWidth={2.2} />
+                      ) : playing ? (
+                        <Pause size={30} fill="currentColor" />
+                      ) : (
+                        <Play size={30} fill="currentColor" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-              ) : null}
-              <button
-                type="button"
-                className={`video-play-toggle${showCenterControl || passive ? ' is-shown' : ''}${playing && !soundOn ? ' is-muted' : ''}${passive ? ' is-passive-control' : ''}`}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleVideoControl()
-                }}
-                aria-label={playing && !soundOn ? 'Unmute' : playing ? 'Pause' : 'Play'}
-              >
-                {playing && !soundOn ? (
-                  <VolumeX size={28} strokeWidth={2.2} />
-                ) : playing ? (
-                  <Pause size={28} fill="currentColor" />
-                ) : (
-                  <Play size={28} fill="currentColor" />
-                )}
-              </button>
-              <div
-                className="video-timeline"
-                role="slider"
-                aria-label="Audio progress"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(progress * 100)}
-                tabIndex={0}
-                onPointerDown={(event) => {
-                  scrubbingRef.current = true
-                  event.currentTarget.setPointerCapture(event.pointerId)
-                  seekToRatio(ratioFromEvent(event))
-                }}
-                onPointerMove={(event) => {
-                  if (!scrubbingRef.current) return
-                  seekToRatio(ratioFromEvent(event))
-                }}
-                onPointerUp={() => {
-                  scrubbingRef.current = false
-                }}
-                onPointerCancel={() => {
-                  scrubbingRef.current = false
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'ArrowRight') seekToRatio(progress + 0.05)
-                  if (event.key === 'ArrowLeft') seekToRatio(progress - 0.05)
-                }}
-              >
-                <span className="video-timeline-track">
-                  <span className="video-timeline-fill" style={{ width: `${progress * 100}%` }} />
-                </span>
-              </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`video-play-toggle${showCenterControl ? ' is-shown' : ''}${playing && !soundOn ? ' is-muted' : ''}`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleVideoControl()
+                    }}
+                    aria-label={playing && !soundOn ? 'Unmute' : playing ? 'Pause' : 'Play'}
+                  >
+                    {playing && !soundOn ? (
+                      <VolumeX size={28} strokeWidth={2.2} />
+                    ) : playing ? (
+                      <Pause size={28} fill="currentColor" />
+                    ) : (
+                      <Play size={28} fill="currentColor" />
+                    )}
+                  </button>
+                  <div
+                    className="video-timeline"
+                    role="slider"
+                    aria-label="Video progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(progress * 100)}
+                    tabIndex={0}
+                    onPointerDown={(event) => {
+                      scrubbingRef.current = true
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                      seekToRatio(ratioFromEvent(event))
+                    }}
+                    onPointerMove={(event) => {
+                      if (!scrubbingRef.current) return
+                      seekToRatio(ratioFromEvent(event))
+                    }}
+                    onPointerUp={() => {
+                      scrubbingRef.current = false
+                    }}
+                    onPointerCancel={() => {
+                      scrubbingRef.current = false
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowRight') seekToRatio(progress + 0.05)
+                      if (event.key === 'ArrowLeft') seekToRatio(progress - 0.05)
+                    }}
+                  >
+                    <span className="video-timeline-track">
+                      <span className="video-timeline-fill" style={{ width: `${progress * 100}%` }} />
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}`}>

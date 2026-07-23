@@ -1043,48 +1043,63 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   opacity: 0;
   pointer-events: none;
 }
-.passive-audio-stage {
+.lesson-media.is-passive-media {
+  background: #0a0a0a;
+}
+.passive-player {
   position: absolute;
   inset: 0;
   z-index: 2;
   display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 10px;
-  padding: 72px 28px 110px;
-  text-align: center;
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  align-content: stretch;
+  gap: 18px;
+  padding:
+    calc(64px + env(safe-area-inset-top))
+    24px
+    calc(28px + env(safe-area-inset-bottom));
   background:
-    radial-gradient(ellipse at center, rgba(255,255,255,.06), transparent 58%),
-    #0d0d0d;
-  pointer-events: none;
+    radial-gradient(ellipse at 50% 18%, rgba(255,255,255,.08), transparent 52%),
+    linear-gradient(180deg, #171717 0%, #0a0a0a 58%, #050505 100%);
 }
-.passive-pulse {
-  width: 96px;
-  height: 96px;
-  border-radius: 999px;
+.passive-cover {
+  width: min(72vw, 300px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: 18px;
   display: grid;
   place-items: center;
   color: #f2f2f2;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.14);
-  margin-bottom: 8px;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.03)),
+    #1a1a1a;
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
   position: relative;
+  align-self: end;
 }
-.passive-pulse.is-playing::before,
-.passive-pulse.is-playing::after {
+.passive-cover.is-playing::before,
+.passive-cover.is-playing::after {
   content: '';
   position: absolute;
-  inset: -8px;
-  border-radius: inherit;
-  border: 1px solid rgba(255,255,255,.18);
-  animation: passive-ring 1.8s ease-out infinite;
+  inset: -10px;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,.14);
+  animation: passive-ring 2s ease-out infinite;
+  pointer-events: none;
 }
-.passive-pulse.is-playing::after {
-  animation-delay: .6s;
+.passive-cover.is-playing::after {
+  animation-delay: .7s;
 }
 @keyframes passive-ring {
-  from { transform: scale(.92); opacity: .7; }
-  to { transform: scale(1.35); opacity: 0; }
+  from { transform: scale(.96); opacity: .55; }
+  to { transform: scale(1.12); opacity: 0; }
+}
+.passive-meta {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  min-width: 0;
 }
 .passive-kicker {
   margin: 0;
@@ -1094,30 +1109,112 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-.passive-audio-stage h2 {
+.passive-meta h2 {
   margin: 0;
-  max-width: 16ch;
   font-size: 24px;
   line-height: 1.2;
-  letter-spacing: -.03em;
+  letter-spacing: -.04em;
+  font-weight: 800;
 }
 .passive-hint {
   margin: 0;
   color: #9a9a9a;
   font-size: 13px;
 }
-.video-play-toggle.is-passive-control {
-  bottom: 56px;
-  width: 58px;
-  height: 58px;
+.passive-scrubber {
+  display: grid;
+  gap: 8px;
+  touch-action: none;
+}
+.passive-scrubber-track {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  overflow: hidden;
+}
+.passive-scrubber-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #f2f2f2;
+}
+.passive-times {
+  display: flex;
+  justify-content: space-between;
+  color: #8a8a8a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.passive-controls {
+  display: grid;
+  place-items: center;
+  padding-bottom: 4px;
+}
+.passive-play-btn {
+  width: 72px;
+  height: 72px;
+  border: 0;
+  border-radius: 999px;
+  background: #f2f2f2;
+  color: #111;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.passive-play-btn:active {
+  transform: scale(0.97);
 }
 .quiz-stack.is-passive-quiz {
-  padding: 56px 20px 28px;
-  gap: 18px;
-  justify-content: center;
+  height: 100%;
+  min-height: 100%;
+  padding:
+    calc(64px + env(safe-area-inset-top))
+    18px
+    calc(24px + env(safe-area-inset-bottom));
+  gap: 16px;
+  justify-content: stretch;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.06), transparent 45%),
+    #0a0a0a;
+}
+.quiz-stack.is-passive-quiz .quiz-header {
+  padding-right: 0;
+  flex: none;
+}
+.quiz-stack.is-passive-quiz .quiz-header h2 {
+  font-size: clamp(24px, 6.4vw, 32px);
+  line-height: 1.18;
+}
+.quiz-stack.is-passive-quiz .inline-quiz {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.quiz-stack.is-passive-quiz .quiz-options {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 12px;
+}
+.quiz-stack.is-passive-quiz .quiz-options button {
+  min-height: 64px;
+  align-items: center;
+  border-radius: 16px;
+  padding: 16px 16px;
+  font-size: 16px;
+  line-height: 1.3;
+}
+.quiz-stack.is-passive-quiz .quiz-result {
+  margin-top: auto;
 }
 .passive-quiz-ping {
-  margin: 0 auto;
+  margin: 0;
   width: fit-content;
   padding: 6px 12px;
   border-radius: 999px;
@@ -1134,11 +1231,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   45% { transform: scale(1.06); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+.app-shell.passive-mode .mobile-menu-btn {
+  display: none !important;
+}
 .app-shell.passive-mode .feed-arrows {
   display: none;
 }
 .app-shell.passive-mode .comments-sidebar {
   display: none;
+}
+.app-shell.passive-mode .build-badge {
+  opacity: 0.35;
 }
 .feed-scroll {
   flex: 1;
