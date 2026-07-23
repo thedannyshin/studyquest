@@ -25,6 +25,7 @@ declare global {
   interface Window {
     SpeechRecognition?: SpeechRecognitionCtor
     webkitSpeechRecognition?: SpeechRecognitionCtor
+    webkitAudioContext?: typeof AudioContext
   }
 }
 
@@ -34,136 +35,135 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
 }
 
 export function canSpeakQuiz() {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window
+  return typeof window !== 'undefined' && typeof Audio !== 'undefined'
 }
 
 export function canListenForQuiz() {
   return Boolean(getSpeechRecognitionCtor())
 }
 
-let speechUnlocked = false
+// Tiny valid WAV — unlocks the mobile audio session on tap.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+
 let speakToken = 0
-let cachedVoice: SpeechSynthesisVoice | null = null
+let currentAudio: HTMLAudioElement | null = null
+let audioContext: AudioContext | null = null
 
-function refreshVoice() {
-  if (!canSpeakQuiz()) return null
-  const voices = window.speechSynthesis.getVoices()
-  if (voices.length === 0) return cachedVoice
-  cachedVoice = voices.find((voice) => /en(-|_)US/i.test(voice.lang) && !/compact/i.test(voice.name))
-    ?? voices.find((voice) => /^en/i.test(voice.lang))
-    ?? voices[0]
-  return cachedVoice
-}
-
-if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-  window.speechSynthesis.getVoices()
-  window.speechSynthesis.addEventListener('voiceschanged', () => {
-    refreshVoice()
+function pauseFeedVideos() {
+  if (typeof document === 'undefined') return
+  document.querySelectorAll('video').forEach((node) => {
+    const video = node as HTMLVideoElement
+    video.pause()
   })
 }
 
-/** Must run synchronously inside a tap handler (iOS). */
-export function unlockSpeechSynthesis() {
-  if (!canSpeakQuiz()) return
-  speechUnlocked = true
-  const synth = window.speechSynthesis
-  try {
-    synth.cancel()
-    synth.resume()
-    synth.getVoices()
-    refreshVoice()
+function ttsUrl(text: string) {
+  const url = new URL('https://api.streamelements.com/kappa/v2/speech')
+  url.searchParams.set('voice', 'Brian')
+  url.searchParams.set('text', text.slice(0, 280))
+  return url.toString()
+}
 
-    // Keep this synchronous with the tap — do not await voices.
-    const unlock = new SpeechSynthesisUtterance('Ready')
-    unlock.rate = 1
-    unlock.volume = 1
-    unlock.lang = 'en-US'
-    const voice = cachedVoice ?? refreshVoice()
-    if (voice) {
-      unlock.voice = voice
-      unlock.lang = voice.lang
+function waitForAudioEnd(audio: HTMLAudioElement, token: number) {
+  return new Promise<void>((resolve) => {
+    if (token !== speakToken) {
+      resolve()
+      return
     }
-    synth.speak(unlock)
+    const settle = () => {
+      audio.removeEventListener('ended', settle)
+      audio.removeEventListener('error', settle)
+      resolve()
+    }
+    audio.addEventListener('ended', settle)
+    audio.addEventListener('error', settle)
+  })
+}
+
+/** Unlocks iOS/Android audio session. Call from a tap handler. */
+export function unlockAudioSession() {
+  pauseFeedVideos()
+
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (Ctx) {
+      audioContext = audioContext ?? new Ctx()
+      void audioContext.resume()
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const silent = new Audio(SILENT_WAV)
+    silent.muted = false
+    silent.volume = 1
+    void silent.play().catch(() => {})
   } catch {
     // ignore
   }
 }
 
-export function isSpeechUnlocked() {
-  return speechUnlocked
+/** Call from Passive toggle — unlocks session and plays an audible Ready clip. */
+export function unlockSpeechSynthesis() {
+  unlockAudioSession()
+  void playAudioClip('Ready')
 }
 
 export function stopSpeaking() {
   speakToken += 1
-  if (!canSpeakQuiz()) return
-  try {
-    window.speechSynthesis.cancel()
-  } catch {
-    // ignore
-  }
-}
-
-function speakChunk(text: string, rate: number, token: number) {
-  return new Promise<void>((resolve) => {
-    if (!canSpeakQuiz() || token !== speakToken) {
-      resolve()
-      return
-    }
-
-    const synth = window.speechSynthesis
+  if (currentAudio) {
     try {
-      synth.resume()
+      currentAudio.pause()
+      currentAudio.removeAttribute('src')
+      currentAudio.load()
     } catch {
       // ignore
     }
-
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = rate
-    utterance.pitch = 1
-    utterance.volume = 1
-    utterance.lang = 'en-US'
-    const voice = cachedVoice ?? refreshVoice()
-    if (voice) {
-      utterance.voice = voice
-      utterance.lang = voice.lang
-    }
-
-    let settled = false
-    const settle = () => {
-      if (settled) return
-      settled = true
-      window.clearInterval(watchdog)
-      window.clearTimeout(timeout)
-      resolve()
-    }
-
-    utterance.onend = settle
-    utterance.onerror = settle
-
-    const watchdog = window.setInterval(() => {
-      if (token !== speakToken) {
-        settle()
-        return
-      }
-      try {
-        if (synth.paused) synth.resume()
-      } catch {
-        settle()
-      }
-    }, 200)
-
-    // If the browser silently drops the utterance, don't hang forever.
-    const timeout = window.setTimeout(settle, Math.min(12000, Math.max(2500, text.length * 70)))
-
-    try {
-      synth.speak(utterance)
-    } catch {
-      settle()
-    }
-  })
+    currentAudio = null
+  }
 }
 
-function chunkSpeech(text: string, maxLen = 140) {
+async function playAudioClip(text: string) {
+  if (!canSpeakQuiz() || !text.trim()) return
+  const token = speakToken
+  pauseFeedVideos()
+
+  const audio = new Audio()
+  currentAudio = audio
+  audio.preload = 'auto'
+  audio.muted = false
+  audio.defaultMuted = false
+  audio.volume = 1
+  audio.playsInline = true
+  audio.setAttribute('playsinline', 'true')
+  audio.src = ttsUrl(text)
+
+  try {
+    await audio.play()
+  } catch {
+    return
+  }
+
+  if (token !== speakToken) {
+    audio.pause()
+    return
+  }
+
+  await waitForAudioEnd(audio, token)
+}
+
+export async function speakText(text: string) {
+  if (!text.trim()) return
+  const chunks = chunkSpeech(text, 180)
+  const token = speakToken
+  for (const chunk of chunks) {
+    if (token !== speakToken) return
+    await playAudioClip(chunk)
+  }
+}
+
+function chunkSpeech(text: string, maxLen = 180) {
   const parts = text
     .split(/(?<=[.!?])\s+|\n+/)
     .map((part) => part.trim())
@@ -187,21 +187,6 @@ function chunkSpeech(text: string, maxLen = 140) {
   return chunks.length > 0 ? chunks : [text]
 }
 
-export async function speakText(text: string, rate = 1) {
-  if (!canSpeakQuiz() || !text.trim()) return
-  const token = speakToken
-  refreshVoice()
-
-  // Tiny gap after cancel so iOS/Chrome accept the next utterance.
-  await new Promise((resolve) => window.setTimeout(resolve, 80))
-  if (token !== speakToken) return
-
-  for (const chunk of chunkSpeech(text)) {
-    if (token !== speakToken) return
-    await speakChunk(chunk, rate, token)
-  }
-}
-
 export function buildQuizSpeechParts(question: string, options: string[]) {
   return [
     question,
@@ -212,10 +197,12 @@ export function buildQuizSpeechParts(question: string, options: string[]) {
 }
 
 export async function speakQuiz(question: string, options: string[]) {
+  const parts = buildQuizSpeechParts(question, options)
   const token = speakToken
-  for (const part of buildQuizSpeechParts(question, options)) {
+  pauseFeedVideos()
+  for (const part of parts) {
     if (token !== speakToken) return
-    await speakText(part)
+    await playAudioClip(part)
   }
 }
 
@@ -318,7 +305,7 @@ export function warmUpSpeechRecognition() {
       }
     }, 120)
   } catch {
-    // Permission or start race — ignore.
+    // ignore
   }
 }
 

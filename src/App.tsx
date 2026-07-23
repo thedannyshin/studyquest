@@ -13,6 +13,7 @@ import {
   speakText,
   startListeningForOption,
   stopSpeaking,
+  unlockAudioSession,
   unlockSpeechSynthesis,
   warmUpSpeechRecognition,
 } from './voiceQuiz'
@@ -2376,8 +2377,10 @@ function PostCard({
 
   const replayQuizSpeech = () => {
     if (!quiz?.options?.length || displaySubmitted) return
-    unlockSpeechSynthesis()
+    stopSpeaking()
+    unlockAudioSession()
     setVoiceStatus('speaking')
+    // First MP3 play() happens inside this tap turn (required on iOS).
     void speakQuiz(quiz.question, quiz.options).then(() => {
       if (!activeRef.current || displaySubmitted) return
       if (!canListenForQuiz()) {
@@ -2385,6 +2388,8 @@ function PostCard({
         return
       }
       setVoiceStatus('listening')
+    }).catch(() => {
+      setVoiceStatus('unsupported')
     })
   }
 
