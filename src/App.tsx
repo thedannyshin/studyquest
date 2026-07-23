@@ -2773,9 +2773,6 @@ function PostCard({
             </div>
           ) : (
             <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}`}>
-              {passive && (
-                <p className="passive-quiz-ping" role="status">Quick check</p>
-              )}
               <div className="quiz-header">
                 <h2>{title}</h2>
               </div>

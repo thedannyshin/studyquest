@@ -1053,51 +1053,52 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
   align-content: stretch;
-  gap: 22px;
+  gap: 28px;
   padding:
-    calc(72px + env(safe-area-inset-top))
-    24px
-    calc(36px + env(safe-area-inset-bottom));
+    calc(56px + env(safe-area-inset-top))
+    22px
+    calc(28px + env(safe-area-inset-bottom));
   background:
-    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.07), transparent 50%),
+    radial-gradient(ellipse at 50% 32%, rgba(255,255,255,.08), transparent 55%),
     linear-gradient(180deg, #171717 0%, #0a0a0a 58%, #050505 100%);
 }
 .passive-meta {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   text-align: left;
   min-width: 0;
-  align-content: end;
-  padding-bottom: 8px;
+  align-content: center;
+  padding: 12px 0;
 }
 .passive-kicker {
   margin: 0;
   color: #8a8a8a;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
 }
 .passive-meta h2 {
   margin: 0;
-  font-size: clamp(26px, 7vw, 34px);
-  line-height: 1.15;
-  letter-spacing: -.04em;
+  max-width: 11em;
+  font-size: clamp(32px, 9vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -.05em;
   font-weight: 800;
 }
 .passive-hint {
   margin: 0;
   color: #9a9a9a;
-  font-size: 13px;
+  font-size: 14px;
 }
 .passive-scrubber {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   touch-action: none;
 }
 .passive-scrubber-track {
   display: block;
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
   background: rgba(255,255,255,.18);
   overflow: hidden;
@@ -1112,17 +1113,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   display: flex;
   justify-content: space-between;
   color: #8a8a8a;
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .passive-controls {
   display: grid;
   place-items: center;
-  padding-bottom: 4px;
+  padding: 8px 0 12px;
 }
 .passive-play-btn {
-  width: 72px;
-  height: 72px;
+  width: 88px;
+  height: 88px;
   border: 0;
   border-radius: 999px;
   background: #f2f2f2;
@@ -1131,7 +1132,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   place-items: center;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 .passive-play-btn:active {
   transform: scale(0.97);
@@ -1140,10 +1141,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   height: 100%;
   min-height: 100%;
   padding:
-    calc(64px + env(safe-area-inset-top))
-    18px
-    calc(24px + env(safe-area-inset-bottom));
-  gap: 16px;
+    calc(56px + env(safe-area-inset-top))
+    16px
+    calc(18px + env(safe-area-inset-bottom));
+  gap: 18px;
   justify-content: stretch;
   background:
     radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.06), transparent 45%),
@@ -1154,8 +1155,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   flex: none;
 }
 .quiz-stack.is-passive-quiz .quiz-header h2 {
-  font-size: clamp(24px, 6.4vw, 32px);
-  line-height: 1.18;
+  font-size: clamp(28px, 7.2vw, 36px);
+  line-height: 1.15;
 }
 .quiz-stack.is-passive-quiz .inline-quiz {
   flex: 1;
@@ -1172,33 +1173,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   gap: 12px;
 }
 .quiz-stack.is-passive-quiz .quiz-options button {
-  min-height: 64px;
+  min-height: 0;
+  height: 100%;
   align-items: center;
-  border-radius: 16px;
-  padding: 16px 16px;
-  font-size: 16px;
+  border-radius: 18px;
+  padding: 18px 16px;
+  font-size: 17px;
   line-height: 1.3;
 }
 .quiz-stack.is-passive-quiz .quiz-result {
   margin-top: auto;
-}
-.passive-quiz-ping {
-  margin: 0;
-  width: fit-content;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #f2f2f2;
-  color: #111;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  animation: passive-ping 1.1s ease;
-}
-@keyframes passive-ping {
-  0% { transform: scale(.86); opacity: 0; }
-  45% { transform: scale(1.06); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
 }
 .app-shell.passive-mode .mobile-menu-btn {
   display: none !important;
