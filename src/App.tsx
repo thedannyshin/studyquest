@@ -24,6 +24,7 @@ import {
   Plus,
   Send,
   FileText,
+  Folder,
   User,
   Users,
   Video,
@@ -1894,35 +1895,60 @@ function App() {
             className="upload-picker-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Choose materials"
+            aria-label="Open materials"
             onClick={(event) => event.stopPropagation()}
           >
-            <header>
-              <strong>Choose materials</strong>
+            <header className="upload-picker-titlebar">
+              <strong>Open</strong>
               <button type="button" aria-label="Close" onClick={() => setUploadPickerOpen(false)}>
-                <X size={18} strokeWidth={2.2} />
+                <X size={16} strokeWidth={2.2} />
               </button>
             </header>
-            <p>Pick what you want StudyQuest AI to turn into a video.</p>
-            <ul className="upload-picker-list">
-              {generateSamples.map((sample) => (
-                <li key={sample.id}>
-                  <button
-                    type="button"
-                    className={uploadSampleId === sample.id ? 'active' : ''}
-                    onClick={() => selectGenerateSample(sample)}
-                  >
-                    <span className="upload-picker-icon" aria-hidden="true">
-                      <FileText size={20} strokeWidth={2} />
-                    </span>
-                    <span className="upload-picker-copy">
-                      <strong>{sample.materialLabel}</strong>
-                      <span>{sample.materialType} · {sample.classCode}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
+
+            <div className="upload-picker-path" aria-label="Current folder">
+              <Folder size={14} strokeWidth={2.2} aria-hidden="true" />
+              <span>Materials</span>
+              <ChevronRight size={12} strokeWidth={2.4} aria-hidden="true" />
+              <span>Systems</span>
+            </div>
+
+            <div className="upload-picker-columns" aria-hidden="true">
+              <span className="upload-picker-col-name">Name</span>
+              <span className="upload-picker-col-kind">Kind</span>
+              <span className="upload-picker-col-class">Class</span>
+            </div>
+
+            <ul className="upload-picker-list" role="listbox" aria-label="Materials">
+              {generateSamples.map((sample) => {
+                const fileName = sample.file.split('/').pop() ?? sample.materialLabel
+                return (
+                  <li key={sample.id} role="option" aria-selected={uploadSampleId === sample.id}>
+                    <button
+                      type="button"
+                      className={uploadSampleId === sample.id ? 'active' : ''}
+                      onClick={() => selectGenerateSample(sample)}
+                    >
+                      <span className="upload-picker-icon" aria-hidden="true">
+                        <FileText size={16} strokeWidth={2} />
+                      </span>
+                      <span className="upload-picker-col-name">
+                        <strong>{sample.materialLabel}</strong>
+                        <em>{fileName}</em>
+                      </span>
+                      <span className="upload-picker-col-kind">{sample.materialType}</span>
+                      <span className="upload-picker-col-class">{sample.classCode}</span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
+
+            <footer className="upload-picker-footer">
+              <span>{generateSamples.length} items</span>
+              <button type="button" onClick={() => setUploadPickerOpen(false)}>
+                Cancel
+              </button>
+            </footer>
           </div>
         </div>,
         document.body,
