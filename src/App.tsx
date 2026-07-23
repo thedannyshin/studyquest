@@ -2338,6 +2338,12 @@ function PostCard({
         return
       }
 
+      // iOS Safari blocks audio outside a tap — wait for Hear question.
+      if (isIOSDevice()) {
+        setVoiceStatus('idle')
+        return
+      }
+
       started = true
       setVoiceStatus('speaking')
       await speakQuiz(quiz.question, quiz.options ?? [])
@@ -2888,12 +2894,12 @@ function PostCard({
                     {displaySubmitted
                       ? (displayCorrect ? 'Correct' : 'Incorrect')
                       : voiceStatus === 'speaking'
-                        ? 'Reading question…'
+                        ? 'Playing quiz audio…'
                         : voiceStatus === 'listening'
                           ? 'Listening… say A, B, C, or D'
                           : voiceStatus === 'unsupported'
                             ? 'Voice unavailable — tap an answer'
-                            : 'Get ready'}
+                            : 'Tap Hear question'}
                   </p>
                   {!displaySubmitted && canSpeakQuiz() && (
                     <button

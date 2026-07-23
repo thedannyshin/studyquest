@@ -41,14 +41,15 @@ export function isIOSDevice() {
 }
 
 export function canSpeakQuiz() {
-  return typeof window !== 'undefined' && (
-    typeof Audio !== 'undefined' || 'speechSynthesis' in window
-  )
+  return typeof window !== 'undefined' && typeof Audio !== 'undefined'
 }
 
 export function canListenForQuiz() {
   return Boolean(getSpeechRecognitionCtor())
 }
+
+const READY_MP3 = '/audio/ready.mp3'
+const CORRECT_MP3 = '/audio/correct.mp3'
 
 let speakToken = 0
 let voiceSession = 0
@@ -56,9 +57,15 @@ let currentAudio: HTMLAudioElement | null = null
 let sharedAudio: HTMLAudioElement | null = null
 let audioContext: AudioContext | null = null
 let unlocked = false
+let objectUrls: string[] = []
+const blobUrlCache = new Map<string, string>()
 
 export function getVoiceSession() {
   return voiceSession
+}
+
+export function isAudioSessionUnlocked() {
+  return unlocked
 }
 
 function pauseFeedVideos() {
@@ -69,36 +76,48 @@ function pauseFeedVideos() {
   })
 }
 
+/** One HTMLAudioElement in the DOM — iOS Safari is most reliable this way. */
 function getSharedAudio() {
   if (!sharedAudio) {
-    sharedAudio = new Audio()
+    sharedAudio = document.createElement('audio')
     sharedAudio.preload = 'auto'
     sharedAudio.muted = false
     sharedAudio.defaultMuted = false
     sharedAudio.volume = 1
     sharedAudio.setAttribute('playsinline', 'true')
     sharedAudio.setAttribute('webkit-playsinline', 'true')
+    sharedAudio.setAttribute('controls', 'false')
+    sharedAudio.style.display = 'none'
+    document.body.appendChild(sharedAudio)
   }
+  sharedAudio.muted = false
+  sharedAudio.defaultMuted = false
+  sharedAudio.volume = 1
   return sharedAudio
 }
 
-/** Same-origin MP3 proxy — required on iOS Safari (blocks translate.google.com media). */
-function ttsUrl(text: string) {
+/** Same-origin MP3 from our Vercel/Vite TTS proxy. */
+function ttsApiUrl(text: string) {
   const url = new URL('/api/tts', window.location.origin)
   url.searchParams.set('text', text.slice(0, 180))
   return url.toString()
 }
 
-function pickEnglishVoice(): SpeechSynthesisVoice | null {
-  if (!('speechSynthesis' in window)) return null
-  const voices = window.speechSynthesis.getVoices()
-  if (!voices.length) return null
-  return (
-    voices.find((voice) => voice.lang === 'en-US' && /samantha|karen|moira|daniel|enhanced/i.test(voice.name))
-    || voices.find((voice) => voice.lang.startsWith('en') && voice.localService)
-    || voices.find((voice) => voice.lang.startsWith('en'))
-    || null
-  )
+function rememberObjectUrl(url: string) {
+  objectUrls.push(url)
+  return url
+}
+
+function revokeObjectUrls() {
+  for (const url of objectUrls) {
+    try {
+      URL.revokeObjectURL(url)
+    } catch {
+      // ignore
+    }
+  }
+  objectUrls = []
+  blobUrlCache.clear()
 }
 
 function waitForAudioEnd(audio: HTMLAudioElement, token: number) {
@@ -124,92 +143,59 @@ function waitForAudioEnd(audio: HTMLAudioElement, token: number) {
   })
 }
 
-function speakWithSynthesis(text: string, token: number) {
-  return new Promise<void>((resolve) => {
-    if (!('speechSynthesis' in window) || !text.trim() || token !== speakToken) {
-      resolve()
-      return
-    }
+/** Download TTS as a real audio file (blob), then play from a local object URL. */
+async function resolveClipUrl(text: string): Promise<string | null> {
+  const trimmed = text.trim().slice(0, 180)
+  if (!trimmed) return null
 
-    // iOS sometimes leaves synthesis in a paused state.
-    try {
-      window.speechSynthesis.resume()
-    } catch {
-      // ignore
-    }
+  if (/^correct\.?$/i.test(trimmed)) return CORRECT_MP3
+  if (/^ready\.?$/i.test(trimmed)) return READY_MP3
 
-    const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = 'en-US'
-    utter.rate = 1
-    utter.pitch = 1
-    utter.volume = 1
-    const voice = pickEnglishVoice()
-    if (voice) utter.voice = voice
+  const cached = blobUrlCache.get(trimmed)
+  if (cached) return cached
 
-    const poll = window.setInterval(() => {
-      if (token !== speakToken) {
-        window.clearInterval(poll)
-        try {
-          window.speechSynthesis.cancel()
-        } catch {
-          // ignore
-        }
-        resolve()
-      }
-    }, 80)
-
-    const settle = () => {
-      window.clearInterval(poll)
-      resolve()
-    }
-
-    utter.onend = settle
-    utter.onerror = settle
-    window.speechSynthesis.speak(utter)
-
-    // iOS Safari: kick resume shortly after speak.
-    window.setTimeout(() => {
-      try {
-        window.speechSynthesis.resume()
-      } catch {
-        // ignore
-      }
-    }, 40)
-  })
-}
-
-async function speakPartsWithSynthesis(parts: string[], token: number) {
-  for (const part of parts) {
-    if (token !== speakToken) return
-    await speakWithSynthesis(part, token)
-  }
-}
-
-function playUnlockBeep() {
   try {
-    const Ctx = window.AudioContext || window.webkitAudioContext
-    if (!Ctx) return
-    audioContext = audioContext ?? new Ctx()
-    void audioContext.resume()
-    const osc = audioContext.createOscillator()
-    const gain = audioContext.createGain()
-    osc.type = 'sine'
-    osc.frequency.value = 880
-    gain.gain.value = 0.0001
-    gain.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.16)
-    osc.connect(gain)
-    gain.connect(audioContext.destination)
-    osc.start()
-    osc.stop(audioContext.currentTime + 0.18)
+    const response = await fetch(ttsApiUrl(trimmed), { cache: 'force-cache' })
+    if (!response.ok) return null
+    const blob = await response.blob()
+    if (blob.size < 100) return null
+    const file = blob.type.startsWith('audio/')
+      ? blob
+      : new Blob([blob], { type: 'audio/mpeg' })
+    const url = rememberObjectUrl(URL.createObjectURL(file))
+    blobUrlCache.set(trimmed, url)
+    return url
   } catch {
-    // ignore
+    return null
   }
+}
+
+async function playSrc(src: string, token: number) {
+  const audio = getSharedAudio()
+  currentAudio = audio
+  audio.muted = false
+  audio.defaultMuted = false
+  audio.volume = 1
+  audio.src = src
+
+  try {
+    await audio.play()
+  } catch {
+    return false
+  }
+
+  if (token !== speakToken) {
+    audio.pause()
+    return false
+  }
+
+  await waitForAudioEnd(audio, token)
+  return !audio.error
 }
 
 /**
  * Call from a user tap (Passive toggle / Hear question).
- * On iOS this must run inside the gesture; it does not announce "Ready".
+ * Must invoke audio.play() inside the gesture so iOS allows later clips.
  */
 export function unlockAudioSession() {
   pauseFeedVideos()
@@ -225,55 +211,22 @@ export function unlockAudioSession() {
     // ignore
   }
 
-  playUnlockBeep()
-
-  if ('speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.getVoices()
-      window.speechSynthesis.addEventListener('voiceschanged', () => {
-        window.speechSynthesis.getVoices()
-      }, { once: true })
-      window.speechSynthesis.resume()
-    } catch {
-      // ignore
-    }
-  }
-
-  // Prime a same-origin audio element (empty play after src set happens in Ready unlock).
-  getSharedAudio()
-}
-
-/** Passive toggle: unlock + audible Ready (MP3 + on-device TTS). */
-export function unlockSpeechSynthesis() {
-  unlockAudioSession()
-
   const audio = getSharedAudio()
   try {
     audio.pause()
     audio.muted = false
     audio.volume = 1
-    audio.src = '/audio/ready.mp3'
+    audio.src = READY_MP3
+    // Critical: play() in this turn unlocks the element for later MP3s.
     void audio.play().catch(() => {})
   } catch {
     // ignore
   }
+}
 
-  if ('speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.resume()
-      const utter = new SpeechSynthesisUtterance('Ready')
-      utter.lang = 'en-US'
-      utter.rate = 1
-      utter.volume = 1
-      const voice = pickEnglishVoice()
-      if (voice) utter.voice = voice
-      // Must speak in this tap turn — do not cancel afterward.
-      window.speechSynthesis.speak(utter)
-    } catch {
-      // ignore
-    }
-  }
+/** Passive toggle: unlock + audible Ready MP3. */
+export function unlockSpeechSynthesis() {
+  unlockAudioSession()
 }
 
 export function stopSpeaking() {
@@ -282,8 +235,6 @@ export function stopSpeaking() {
   if (currentAudio) {
     try {
       currentAudio.pause()
-      currentAudio.removeAttribute('src')
-      currentAudio.load()
     } catch {
       // ignore
     }
@@ -296,49 +247,15 @@ export function stopSpeaking() {
       // ignore
     }
   }
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    window.speechSynthesis.cancel()
-  }
-}
-
-async function playMp3Clip(text: string, token: number) {
-  const audio = getSharedAudio()
-  currentAudio = audio
-  audio.muted = false
-  audio.defaultMuted = false
-  audio.volume = 1
-  audio.src = ttsUrl(text)
-
-  try {
-    await audio.play()
-  } catch {
-    return false
-  }
-
-  if (token !== speakToken) {
-    audio.pause()
-    return false
-  }
-
-  await waitForAudioEnd(audio, token)
-  return !audio.error && Number.isFinite(audio.duration) && audio.duration > 0.05
 }
 
 async function playAudioClip(text: string) {
-  if (!canSpeakQuiz() || !text.trim()) return
+  if (!canSpeakQuiz() || !text.trim()) return false
   const token = speakToken
   pauseFeedVideos()
-
-  // iOS Safari: prefer on-device speech. Remote/cross-origin MP3 is often silent.
-  if (isIOSDevice() && 'speechSynthesis' in window) {
-    await speakWithSynthesis(text, token)
-    return
-  }
-
-  const played = await playMp3Clip(text, token)
-  if (!played && token === speakToken) {
-    await speakWithSynthesis(text, token)
-  }
+  const src = await resolveClipUrl(text)
+  if (!src || token !== speakToken) return false
+  return playSrc(src, token)
 }
 
 export async function speakText(text: string) {
@@ -388,12 +305,6 @@ export async function speakQuiz(question: string, options: string[]) {
   const parts = buildQuizSpeechParts(question, options)
   const token = speakToken
   pauseFeedVideos()
-
-  if (isIOSDevice() && 'speechSynthesis' in window) {
-    await speakPartsWithSynthesis(parts, token)
-    return
-  }
-
   for (const part of parts) {
     if (token !== speakToken) return
     await playAudioClip(part)
@@ -401,39 +312,56 @@ export async function speakQuiz(question: string, options: string[]) {
 }
 
 /**
- * Start quiz speech inside a tap handler (Hear question).
- * On iOS, queues speechSynthesis immediately in the gesture — no network wait.
- * Resolves with the voice session id so callers can ignore stale completions.
+ * Hear question — runs inside a tap.
+ * Primes a local MP3 in the gesture, then plays quiz lines as downloaded audio files.
  */
 export async function speakQuizFromGesture(question: string, options: string[]) {
   stopSpeaking()
-  unlockAudioSession()
   const token = speakToken
   const session = voiceSession
   const parts = buildQuizSpeechParts(question, options)
   pauseFeedVideos()
+  unlocked = true
 
-  if ('speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.resume()
-    } catch {
-      // ignore
-    }
-    // First speak() happens synchronously before the first await inside.
-    await speakPartsWithSynthesis(parts, token)
-    return session
+  const audio = getSharedAudio()
+  audio.muted = false
+  audio.volume = 1
+
+  // 1) Start a real local file immediately (user gesture) so iOS allows audio.
+  audio.src = READY_MP3
+  const prime = audio.play()
+
+  // 2) Download the first quiz line as an MP3 blob in parallel.
+  const firstUrlPromise = resolveClipUrl(parts[0] ?? '')
+
+  await prime.catch(() => {})
+  if (token !== speakToken) return session
+
+  // Don't make the user sit through all of Ready — jump to the question.
+  try {
+    audio.pause()
+  } catch {
+    // ignore
   }
 
-  await speakQuiz(question, options)
+  for (let index = 0; index < parts.length; index += 1) {
+    if (token !== speakToken) return session
+    const src = index === 0
+      ? await firstUrlPromise
+      : await resolveClipUrl(parts[index])
+    if (!src) continue
+    const ok = await playSrc(src, token)
+    if (!ok && index === 0) {
+      // If even the first file fails, surface silence rather than hanging.
+      break
+    }
+  }
+
   return session
 }
 
 export function buildQuizSpeech(question: string, options: string[]) {
   return buildQuizSpeechParts(question, options).join(' ')
-}
-
-export function isAudioSessionUnlocked() {
-  return unlocked
 }
 
 function normalizeSpeech(value: string) {
@@ -617,4 +545,11 @@ export function startListeningForOption(
     }
     onStatus?.('ended')
   }
+}
+
+// Keep cache from growing forever across a long study session.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    revokeObjectUrls()
+  })
 }
