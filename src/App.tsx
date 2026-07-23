@@ -471,6 +471,7 @@ const LAST_FEED_CLASS_KEY = 'study-quest-feed-class'
 type QuizResponses = Record<number, string>
 type FeedPositions = Record<string, string>
 const MEDIA_ENABLED_KEY = 'study-quest-media-enabled'
+const INTRO_PENDING_KEY = 'study-quest-intro-pending'
 
 type FeedItem =
   | { type: 'due'; items: (typeof upcomingItems)[number][] }
@@ -478,6 +479,7 @@ type FeedItem =
   | { type: 'post'; post: Post }
   | { type: 'complete' }
   | { type: 'enable' }
+  | { type: 'intro' }
 const PROFILE_PHOTO = 'https://randomuser.me/api/portraits/women/68.jpg'
 const PROFILE_NAME = 'Alex Morgan'
 const PROFILE_EMAIL = 'alex@cca.edu'
@@ -677,12 +679,30 @@ function writeMediaEnabled(enabled: boolean) {
   }
 }
 
+function readIntroPending() {
+  try {
+    return sessionStorage.getItem(INTRO_PENDING_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeIntroPending(pending: boolean) {
+  try {
+    if (pending) sessionStorage.setItem(INTRO_PENDING_KEY, '1')
+    else sessionStorage.removeItem(INTRO_PENDING_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 function getFeedItemKey(item: FeedItem, index: number) {
   if (item.type === 'post') return `post-${item.post.id}`
   if (item.type === 'due') return 'due-board'
   if (item.type === 'complete') return 'feed-complete'
   if (item.type === 'assignment') return 'assignment'
   if (item.type === 'enable') return 'session-enable'
+  if (item.type === 'intro') return 'session-intro'
   return `slide-${index}`
 }
 
@@ -726,6 +746,7 @@ function App() {
   const [studyMode, setStudyMode] = useState<StudyMode>(() => readStudyMode())
   const [mediaEnabled, setMediaEnabled] = useState(() => readMediaEnabled())
   const [mediaEnabling, setMediaEnabling] = useState(false)
+  const [introPending, setIntroPending] = useState(() => readIntroPending())
   const [mobileStudy, setMobileStudy] = useState(() => isMobileStudyDevice())
   const [feedPositions, setFeedPositions] = useState<FeedPositions>(() => readFeedPositions())
   const feedRef = useRef<HTMLElement>(null)
@@ -957,8 +978,14 @@ function App() {
   const goToFeed = (nextProvider?: Provider) => {
     if (nextProvider) setProvider(nextProvider)
     else if (!provider) setProvider('Google Classroom')
+    writeIntroPending(true)
+    setIntroPending(true)
+    writeMediaEnabled(false)
+    setMediaEnabled(false)
     setMainView('feed')
     setScreen('feed')
+    setActiveIndex(0)
+    restoreFeedRef.current = true
   }
 
   const openFeedClass = (classCode: string) => {
@@ -979,6 +1006,10 @@ function App() {
   const logOut = () => {
     clearProgressStorage()
     writeSession(false, null)
+    writeIntroPending(false)
+    writeMediaEnabled(false)
+    setIntroPending(false)
+    setMediaEnabled(false)
     setProvider(null)
     setCompletedIds([])
     setAnsweredIds([])
@@ -1078,7 +1109,15 @@ function App() {
       setSyncProgress((current) => {
         if (current >= 100) {
           window.clearInterval(timer)
-          window.setTimeout(() => setScreen('feed'), 450)
+          window.setTimeout(() => {
+            writeIntroPending(true)
+            setIntroPending(true)
+            writeMediaEnabled(false)
+            setMediaEnabled(false)
+            setActiveIndex(0)
+            restoreFeedRef.current = true
+            setScreen('feed')
+          }, 450)
           return 100
         }
         return Math.min(current + 4, 100)
@@ -1146,6 +1185,9 @@ function App() {
   const feedItems = useMemo(() => {
     const items: FeedItem[] = []
 
+    if (introPending) {
+      items.push({ type: 'intro' })
+    }
     if (passiveMode && !mediaEnabled) {
       items.push({ type: 'enable' })
     }
@@ -1155,11 +1197,11 @@ function App() {
     if (showAssignmentCard) items.push({ type: 'assignment' })
     if (allPostsComplete) items.push({ type: 'complete' })
     return items
-  }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete, passiveMode, mediaEnabled])
+  }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete, passiveMode, mediaEnabled, introPending])
 
   const visibleFeedItems = useMemo(() => {
     if (passiveMode && !mediaEnabled) {
-      return feedItems.filter((item) => item.type === 'enable')
+      return feedItems.filter((item) => item.type === 'intro' || item.type === 'enable')
     }
     for (let i = 0; i < feedItems.length; i++) {
       const item = feedItems[i]
@@ -1174,6 +1216,26 @@ function App() {
     return feedItems
   }, [feedItems, answeredIds, passiveMode, mediaEnabled])
 
+  const dismissIntro = () => {
+    if (!introPending) return
+    const nextIndex = Math.max(0, activeIndex - 1)
+    writeIntroPending(false)
+    setIntroPending(false)
+    setActiveIndex(nextIndex)
+    window.requestAnimationFrame(() => {
+      const slides = feedRef.current?.querySelectorAll<HTMLElement>('.feed-slide')
+      slides?.[nextIndex]?.scrollIntoView({ behavior: 'auto', block: 'start' })
+    })
+  }
+
+  const showSwipeHint = mobileStudy && introPending && visibleFeedItems[activeIndex]?.type === 'intro'
+
+  useEffect(() => {
+    if (!introPending) return
+    const item = visibleFeedItems[activeIndex]
+    if (item && item.type !== 'intro') dismissIntro()
+  }, [activeIndex, visibleFeedItems, introPending])
+
   const enableSessionMedia = async () => {
     if (mediaEnabling) return
     setMediaEnabling(true)
@@ -1184,9 +1246,9 @@ function App() {
     setMediaEnabled(true)
     setMediaEnabling(false)
     restoreFeedRef.current = true
-    setActiveIndex(0)
     window.requestAnimationFrame(() => {
       feedRef.current?.scrollTo({ top: 0 })
+      setActiveIndex(0)
     })
   }
 
@@ -1215,7 +1277,9 @@ function App() {
 
     const savedKey = feedPositions[selectedClass]
     let targetIndex = 0
-    if (savedKey) {
+    if (introPending) {
+      targetIndex = 0
+    } else if (savedKey) {
       const found = visibleFeedItems.findIndex((item, index) => (
         getFeedItemKey(item, index) === savedKey
       ))
@@ -1231,7 +1295,7 @@ function App() {
       setActiveIndex(targetIndex)
       restoreFeedRef.current = false
     })
-  }, [screen, mainView, selectedClass, visibleFeedItems.length, feedPositions])
+  }, [screen, mainView, selectedClass, visibleFeedItems.length, feedPositions, introPending])
 
   useEffect(() => {
     if (screen !== 'feed' || mainView !== 'feed' || restoreFeedRef.current) return
@@ -1554,10 +1618,28 @@ function App() {
                       ? 'feed-complete'
                       : item.type === 'enable'
                         ? 'session-enable'
-                        : `assignment-${index}`
+                        : item.type === 'intro'
+                          ? 'session-intro'
+                          : `assignment-${index}`
               }
             >
-              {item.type === 'enable' ? (
+              {item.type === 'intro' ? (
+                <div className="tiktok-row">
+                  <article className="post-frame intro-session">
+                    <div className="intro-session-content">
+                      <p className="intro-session-kicker">StudyQuest</p>
+                      <h2>You&rsquo;re set. Here&rsquo;s how this works.</h2>
+                      <p>
+                        Your feed mixes short class videos with quick checks. Watch or listen,
+                        answer as you go, and we&rsquo;ll keep surfacing what you still need to practice.
+                      </p>
+                      <p>
+                        Move to the next card when you&rsquo;re ready — that&rsquo;s the whole rhythm.
+                      </p>
+                    </div>
+                  </article>
+                </div>
+              ) : item.type === 'enable' ? (
                 <div className="tiktok-row">
                   <article className="post-frame enable-session is-passive">
                     <div className="enable-session-content">
@@ -1728,6 +1810,12 @@ function App() {
             </div>
           )}
         </section>
+
+        {showSwipeHint && (
+          <div className="swipe-up-hint" aria-hidden="true">
+            <span className="swipe-up-dot" />
+          </div>
+        )}
 
         {visibleFeedItems.length > 1 && (
           <div className="feed-arrows">

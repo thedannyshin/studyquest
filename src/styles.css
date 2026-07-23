@@ -1793,6 +1793,81 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   opacity: .35;
   cursor: default;
 }
+.post-frame.intro-session {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.07), transparent 52%),
+    linear-gradient(180deg, #141414 0%, #0a0a0a 55%, #050505 100%);
+}
+.intro-session-content {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding:
+    calc(72px + env(safe-area-inset-top))
+    24px
+    calc(88px + env(safe-area-inset-bottom));
+  max-width: 34rem;
+}
+.intro-session-kicker {
+  margin: 0;
+  color: #8a8a8a;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.intro-session-content h2 {
+  margin: 0;
+  max-width: 12em;
+  font-size: clamp(30px, 7vw, 42px);
+  line-height: 1.1;
+  letter-spacing: -.04em;
+  font-weight: 800;
+  color: #f2f2f2;
+}
+.intro-session-content p {
+  margin: 0;
+  max-width: 28em;
+  color: #a3a3a3;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.swipe-up-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  z-index: 8;
+  transform: translateX(-50%);
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 56px;
+}
+.swipe-up-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f2f2f2;
+  box-shadow: 0 0 0 6px rgba(242, 242, 242, 0.12);
+  animation: swipe-up-hint 1.35s ease-in-out infinite;
+}
+@keyframes swipe-up-hint {
+  0%, 100% {
+    transform: translateY(10px);
+    opacity: 0.35;
+  }
+  45% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+@media (min-width: 721px) {
+  .swipe-up-hint {
+    display: none;
+  }
+}
 .post-frame.enable-session {
   background:
     radial-gradient(ellipse at 50% 32%, rgba(255,255,255,.08), transparent 55%),
