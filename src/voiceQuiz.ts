@@ -48,8 +48,9 @@ export function canListenForQuiz() {
   return Boolean(getSpeechRecognitionCtor())
 }
 
-const READY_MP3 = '/audio/ready.mp3'
 const CORRECT_MP3 = '/audio/correct.mp3'
+// Tiny silent WAV — unlocks iOS audio in a tap without saying "Ready".
+const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
 
 let speakToken = 0
 let voiceSession = 0
@@ -155,7 +156,6 @@ async function resolveClipUrl(text: string): Promise<string | null> {
   if (!trimmed) return null
 
   if (/^correct\.?$/i.test(trimmed)) return CORRECT_MP3
-  if (/^ready\.?$/i.test(trimmed)) return READY_MP3
 
   const cached = blobUrlCache.get(trimmed)
   if (cached) return cached
@@ -200,7 +200,7 @@ async function playSrc(src: string, token: number) {
 }
 
 /**
- * Call from a user tap (Passive toggle / Hear question).
+ * Call from a user tap (Passive toggle).
  * Must invoke audio.play() inside the gesture so iOS allows later clips.
  */
 export function unlockAudioSession() {
@@ -222,7 +222,7 @@ export function unlockAudioSession() {
     audio.pause()
     audio.muted = false
     audio.volume = 1
-    audio.src = READY_MP3
+    audio.src = SILENT_WAV
     // Critical: play() in this turn unlocks the element for later MP3s.
     void audio.play().catch(() => {})
   } catch {
@@ -230,7 +230,7 @@ export function unlockAudioSession() {
   }
 }
 
-/** Passive toggle: unlock + audible Ready MP3. */
+/** Passive toggle: unlock audio session quietly (no Ready announcement). */
 export function unlockSpeechSynthesis() {
   unlockAudioSession()
 }
@@ -349,8 +349,8 @@ export async function speakQuizFromGesture(question: string, options: string[]) 
   audio.muted = false
   audio.volume = 1
 
-  // 1) Start a real local file immediately (user gesture) so iOS allows audio.
-  audio.src = READY_MP3
+  // 1) Start a silent clip immediately (user gesture) so iOS allows audio.
+  audio.src = SILENT_WAV
   const prime = audio.play()
 
   // 2) Download the first quiz line as an MP3 blob in parallel.
@@ -359,7 +359,6 @@ export async function speakQuizFromGesture(question: string, options: string[]) 
   await prime.catch(() => {})
   if (token !== speakToken) return session
 
-  // Don't make the user sit through all of Ready — jump to the question.
   try {
     audio.pause()
   } catch {
