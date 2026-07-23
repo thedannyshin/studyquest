@@ -40,6 +40,7 @@ import {
   PenTool,
   Play,
   Plus,
+  Loader2,
   Send,
   FileText,
   Search,
@@ -2199,6 +2200,7 @@ function PostCard({
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState(commentSeeds)
   const [playing, setPlaying] = useState(false)
+  const [autoplayPending, setAutoplayPending] = useState(false)
   const [soundOn, setSoundOn] = useState(false)
   const [controlsVisible, setControlsVisible] = useState(true)
   const [progress, setProgress] = useState(0)
@@ -2273,6 +2275,7 @@ function PostCard({
       setSoundOn(false)
       soundOnRef.current = false
       setPlaying(false)
+      setAutoplayPending(false)
       setControlsVisible(true)
       window.clearTimeout(controlsTimerRef.current)
       const video = videoRef.current
@@ -2413,6 +2416,7 @@ function PostCard({
       video.pause()
       video.muted = true
       setPlaying(false)
+      setAutoplayPending(false)
     }
 
     if (!active || completed) {
@@ -2423,16 +2427,20 @@ function PostCard({
       }
     }
 
+    if (passive) setAutoplayPending(true)
+
     const onPlay = () => {
       if (cancelled || !activeRef.current) {
         stop()
         return
       }
+      setAutoplayPending(false)
       setPlaying(true)
       hideControlsAfterDelay()
     }
     const onPause = () => {
       setPlaying(false)
+      setAutoplayPending(false)
       window.clearTimeout(controlsTimerRef.current)
       setControlsVisible(true)
     }
@@ -2467,6 +2475,7 @@ function PostCard({
         stop()
         return
       }
+      setAutoplayPending(false)
       if (passive && video.muted) {
         primeVideoForSound(video)
         soundOnRef.current = true
@@ -2476,6 +2485,7 @@ function PostCard({
     }).catch(() => {
       if (!passive) return
       // Autoplay with sound blocked until the next tap.
+      setAutoplayPending(false)
       setPlaying(false)
     })
 
@@ -2768,7 +2778,9 @@ function PostCard({
                   <div className="passive-meta">
                     <p className="passive-kicker">{post.classCode}</p>
                     <h2>{post.title}</h2>
-                    <p className="passive-hint">{playing ? 'Now playing' : 'Tap play to listen'}</p>
+                    <p className="passive-hint">
+                      {playing ? 'Now playing' : autoplayPending ? 'Starting…' : 'Paused'}
+                    </p>
                   </div>
                   <div
                     className="passive-scrubber"
@@ -2809,12 +2821,15 @@ function PostCard({
                   <div className="passive-controls">
                     <button
                       type="button"
-                      className="passive-play-btn"
+                      className={`passive-play-btn${autoplayPending ? ' is-starting' : ''}`}
                       onClick={handleVideoControl}
-                      aria-label={playing ? 'Pause' : 'Play'}
+                      disabled={autoplayPending}
+                      aria-label={playing ? 'Pause' : autoplayPending ? 'Starting' : 'Play'}
                     >
                       {playing ? (
                         <Pause size={30} fill="currentColor" />
+                      ) : autoplayPending ? (
+                        <Loader2 size={30} className="passive-start-spinner" />
                       ) : (
                         <Play size={30} fill="currentColor" />
                       )}

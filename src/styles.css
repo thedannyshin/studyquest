@@ -1134,6 +1134,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   -webkit-tap-highlight-color: transparent;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 }
+.passive-play-btn.is-starting {
+  cursor: default;
+  opacity: 0.92;
+}
+.passive-play-btn:disabled {
+  pointer-events: none;
+}
+.passive-start-spinner {
+  animation: passive-spin 0.9s linear infinite;
+}
+@keyframes passive-spin {
+  to { transform: rotate(360deg); }
+}
 .passive-play-btn:active {
   transform: scale(0.97);
 }
