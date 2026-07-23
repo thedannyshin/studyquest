@@ -2307,7 +2307,7 @@ function PostCard({
 
   useEffect(() => {
     if (!passive || !active || post.modality !== 'drill' || !displaySubmitted || !hasNext) return
-    const timer = window.setTimeout(() => onNextRef.current(), 1400)
+    const timer = window.setTimeout(() => onNextRef.current(), 2200)
     return () => window.clearTimeout(timer)
   }, [passive, active, post.modality, displaySubmitted, hasNext, post.id])
 
