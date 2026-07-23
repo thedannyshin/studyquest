@@ -83,6 +83,8 @@ function pauseFeedVideos() {
   })
 }
 
+const QUIZ_VOLUME = 0.55
+
 /** One HTMLAudioElement in the DOM — iOS Safari is most reliable this way. */
 function getSharedAudio() {
   if (!sharedAudio) {
@@ -90,7 +92,7 @@ function getSharedAudio() {
     sharedAudio.preload = 'auto'
     sharedAudio.muted = false
     sharedAudio.defaultMuted = false
-    sharedAudio.volume = 1
+    sharedAudio.volume = QUIZ_VOLUME
     sharedAudio.setAttribute('playsinline', 'true')
     sharedAudio.setAttribute('webkit-playsinline', 'true')
     sharedAudio.setAttribute('controls', 'false')
@@ -99,7 +101,7 @@ function getSharedAudio() {
   }
   sharedAudio.muted = false
   sharedAudio.defaultMuted = false
-  sharedAudio.volume = 1
+  sharedAudio.volume = QUIZ_VOLUME
   return sharedAudio
 }
 
@@ -181,7 +183,7 @@ async function playSrc(src: string, token: number) {
   currentAudio = audio
   audio.muted = false
   audio.defaultMuted = false
-  audio.volume = 1
+  audio.volume = QUIZ_VOLUME
   audio.src = src
 
   try {
@@ -221,7 +223,7 @@ export function unlockAudioSession() {
   try {
     audio.pause()
     audio.muted = false
-    audio.volume = 1
+    audio.volume = QUIZ_VOLUME
     audio.src = SILENT_WAV
     // Critical: play() in this turn unlocks the element for later MP3s.
     void audio.play().catch(() => {})
@@ -347,7 +349,7 @@ export async function speakQuizFromGesture(question: string, options: string[]) 
 
   const audio = getSharedAudio()
   audio.muted = false
-  audio.volume = 1
+  audio.volume = QUIZ_VOLUME
 
   // 1) Start a silent clip immediately (user gesture) so iOS allows audio.
   audio.src = SILENT_WAV

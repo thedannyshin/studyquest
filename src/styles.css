@@ -1793,15 +1793,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   opacity: .35;
   cursor: default;
 }
-.post-frame.intro-session {
+.post-frame.welcome-session {
   background:
     radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.07), transparent 52%),
     linear-gradient(180deg, #141414 0%, #0a0a0a 55%, #050505 100%);
 }
-.intro-session-content {
+.welcome-session-content {
   height: 100%;
   display: grid;
   align-content: center;
+  justify-items: start;
   gap: 16px;
   padding:
     calc(72px + env(safe-area-inset-top))
@@ -1809,7 +1810,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     calc(88px + env(safe-area-inset-bottom));
   max-width: 34rem;
 }
-.intro-session-kicker {
+.welcome-session-kicker {
   margin: 0;
   color: #8a8a8a;
   font-size: 13px;
@@ -1817,7 +1818,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-.intro-session-content h2 {
+.welcome-session-content h2 {
   margin: 0;
   max-width: 12em;
   font-size: clamp(30px, 7vw, 42px);
@@ -1826,12 +1827,35 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   font-weight: 800;
   color: #f2f2f2;
 }
-.intro-session-content p {
+.welcome-session-content p {
   margin: 0;
   max-width: 28em;
   color: #a3a3a3;
   font-size: 16px;
   line-height: 1.5;
+}
+.welcome-session-btn {
+  margin-top: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: #f2f2f2;
+  color: #111;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+.welcome-session-btn:disabled {
+  opacity: 0.8;
+  cursor: default;
+}
+.welcome-session-btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .swipe-up-hint {
   position: absolute;
@@ -1880,69 +1904,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   .swipe-up-hint {
     display: none;
   }
-}
-.post-frame.enable-session {
-  background:
-    radial-gradient(ellipse at 50% 32%, rgba(255,255,255,.08), transparent 55%),
-    linear-gradient(180deg, #171717 0%, #0a0a0a 58%, #050505 100%);
-}
-.enable-session-content {
-  height: 100%;
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: 14px;
-  padding:
-    calc(72px + env(safe-area-inset-top))
-    22px
-    calc(36px + env(safe-area-inset-bottom));
-}
-.enable-session-kicker {
-  margin: 0;
-  color: #8a8a8a;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-.enable-session-content h2 {
-  margin: 0;
-  max-width: 10em;
-  font-size: clamp(32px, 9vw, 44px);
-  line-height: 1.08;
-  letter-spacing: -.05em;
-  font-weight: 800;
-  color: #f2f2f2;
-}
-.enable-session-content > p {
-  margin: 0;
-  max-width: 18em;
-  color: #9a9a9a;
-  font-size: 15px;
-  line-height: 1.45;
-}
-.enable-session-btn {
-  margin-top: 10px;
-  border: 0;
-  border-radius: 14px;
-  background: #f2f2f2;
-  color: #111;
-  padding: 14px 18px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  -webkit-tap-highlight-color: transparent;
-}
-.enable-session-btn:disabled {
-  opacity: 0.8;
-  cursor: default;
-}
-.enable-session-btn:active:not(:disabled) {
-  transform: scale(0.98);
 }
 .assignment-content {
   height: 100%;
