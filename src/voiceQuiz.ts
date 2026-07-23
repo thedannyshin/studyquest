@@ -41,24 +41,135 @@ export function canListenForQuiz() {
   return Boolean(getSpeechRecognitionCtor())
 }
 
-export function stopSpeaking() {
-  if (!canSpeakQuiz()) return
-  window.speechSynthesis.cancel()
-}
+let speechUnlocked = false
+let voicesReady: Promise<SpeechSynthesisVoice[]> | null = null
 
-export function speakText(text: string, rate = 1) {
-  return new Promise<void>((resolve) => {
-    if (!canSpeakQuiz() || !text.trim()) {
-      resolve()
+function waitForVoices() {
+  if (!canSpeakQuiz()) return Promise.resolve([] as SpeechSynthesisVoice[])
+  if (voicesReady) return voicesReady
+
+  voicesReady = new Promise((resolve) => {
+    const existing = window.speechSynthesis.getVoices()
+    if (existing.length > 0) {
+      resolve(existing)
       return
     }
 
+    const finish = () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', finish)
+      resolve(window.speechSynthesis.getVoices())
+    }
+
+    window.speechSynthesis.addEventListener('voiceschanged', finish)
+    window.setTimeout(finish, 700)
+  })
+
+  return voicesReady
+}
+
+function pickVoice(voices: SpeechSynthesisVoice[]) {
+  if (voices.length === 0) return null
+  const preferred = voices.find((voice) => /en(-|_)US/i.test(voice.lang) && /siri|Samantha|Karen|Daniel|Google US/i.test(voice.name))
+    ?? voices.find((voice) => /en(-|_)US/i.test(voice.lang))
+    ?? voices.find((voice) => /^en/i.test(voice.lang))
+  return preferred ?? voices[0]
+}
+
+/** Call inside a tap handler so later programmatic speak() works on iOS. */
+export function unlockSpeechSynthesis() {
+  if (!canSpeakQuiz()) return
+  speechUnlocked = true
+  void waitForVoices().then((voices) => {
+    const voice = pickVoice(voices)
+    try {
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.resume()
+      const unlock = new SpeechSynthesisUtterance('Ready')
+      unlock.rate = 1.05
+      unlock.volume = 1
+      unlock.lang = voice?.lang || 'en-US'
+      if (voice) unlock.voice = voice
+      window.speechSynthesis.speak(unlock)
+    } catch {
+      // ignore
+    }
+  })
+
+  // Also kick an immediate empty speak in the gesture turn (iOS requirement).
+  try {
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(' '))
+  } catch {
+    // ignore
+  }
+}
+
+export function stopSpeaking() {
+  if (!canSpeakQuiz()) return
+  try {
+    window.speechSynthesis.cancel()
+  } catch {
+    // ignore
+  }
+}
+
+export async function speakText(text: string, rate = 1) {
+  if (!canSpeakQuiz() || !text.trim()) return
+
+  const voices = await waitForVoices()
+  const voice = pickVoice(voices)
+
+  await new Promise<void>((resolve) => {
     stopSpeaking()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = rate
-    utterance.onend = () => resolve()
-    utterance.onerror = () => resolve()
-    window.speechSynthesis.speak(utterance)
+
+    // Chrome can leave synthesis paused; iOS needs a beat after cancel.
+    window.setTimeout(() => {
+      try {
+        window.speechSynthesis.resume()
+      } catch {
+        // ignore
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = rate
+      utterance.pitch = 1
+      utterance.volume = 1
+      utterance.lang = voice?.lang || 'en-US'
+      if (voice) utterance.voice = voice
+
+      let settled = false
+      const settle = () => {
+        if (settled) return
+        settled = true
+        window.clearInterval(watchdog)
+        resolve()
+      }
+
+      utterance.onend = settle
+      utterance.onerror = settle
+
+      // Chrome bug: speech can freeze unless resumed periodically.
+      const watchdog = window.setInterval(() => {
+        try {
+          if (window.speechSynthesis.paused) window.speechSynthesis.resume()
+          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) settle()
+        } catch {
+          settle()
+        }
+      }, 250)
+
+      try {
+        window.speechSynthesis.speak(utterance)
+        if (!speechUnlocked) {
+          // Still try; unlock should have happened on Passive tap.
+          speechUnlocked = true
+        }
+      } catch {
+        settle()
+      }
+
+      // Safety timeout for silent failures.
+      window.setTimeout(settle, Math.min(20000, Math.max(4000, text.length * 80)))
+    }, 60)
   })
 }
 

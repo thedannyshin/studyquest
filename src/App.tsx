@@ -13,6 +13,7 @@ import {
   speakText,
   startListeningForOption,
   stopSpeaking,
+  unlockSpeechSynthesis,
   warmUpSpeechRecognition,
 } from './voiceQuiz'
 import {
@@ -1386,6 +1387,7 @@ function App() {
             aria-pressed={studyMode === 'passive'}
             onClick={() => {
               markSessionAudioUnlocked()
+              unlockSpeechSynthesis()
               warmUpSpeechRecognition()
               setStudyMode('passive')
             }}
@@ -2356,10 +2358,15 @@ function PostCard({
       )
     }
 
-    void run()
+    // Delay so React Strict Mode remounts don't cancel speech immediately,
+    // and so the Passive unlock utterance can finish first.
+    const startTimer = window.setTimeout(() => {
+      if (!cancelled) void run()
+    }, 450)
 
     return () => {
       cancelled = true
+      window.clearTimeout(startTimer)
       stopSpeaking()
       stopListening?.()
       setVoiceStatus('idle')
@@ -2367,14 +2374,18 @@ function PostCard({
   }, [passive, active, post.modality, post.id, displaySubmitted, quiz])
 
   useEffect(() => {
-    if (!passive || !displaySubmitted || !quiz || quiz.type !== 'multiple-choice') return
-    stopSpeaking()
+    if (!passive || !active || !displaySubmitted || !quiz || quiz.type !== 'multiple-choice') return
     const line = displayCorrect
       ? 'Correct.'
       : `Incorrect. The answer is ${quiz.answer}.`
-    void speakText(line, 1.05)
-    return () => stopSpeaking()
-  }, [passive, displaySubmitted, displayCorrect, quiz, post.id])
+    const timer = window.setTimeout(() => {
+      void speakText(line, 1.05)
+    }, 200)
+    return () => {
+      window.clearTimeout(timer)
+      stopSpeaking()
+    }
+  }, [passive, active, displaySubmitted, displayCorrect, quiz, post.id])
 
   useEffect(() => {
     if (post.modality !== 'video') return
