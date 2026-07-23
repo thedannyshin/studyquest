@@ -470,6 +470,7 @@ const LAST_FEED_CLASS_KEY = 'study-quest-feed-class'
 type QuizResponses = Record<number, string>
 type FeedPositions = Record<string, string>
 const MEDIA_ENABLED_KEY = 'study-quest-media-enabled'
+const WELCOME_PENDING_KEY = 'study-quest-welcome-pending'
 
 type FeedItem =
   | { type: 'due'; items: (typeof upcomingItems)[number][] }
@@ -676,6 +677,23 @@ function writeMediaEnabled(enabled: boolean) {
   }
 }
 
+function readWelcomePending() {
+  try {
+    return sessionStorage.getItem(WELCOME_PENDING_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeWelcomePending(pending: boolean) {
+  try {
+    if (pending) sessionStorage.setItem(WELCOME_PENDING_KEY, '1')
+    else sessionStorage.removeItem(WELCOME_PENDING_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 function getFeedItemKey(item: FeedItem, index: number) {
   if (item.type === 'post') return `post-${item.post.id}`
   if (item.type === 'due') return 'due-board'
@@ -725,7 +743,7 @@ function App() {
   const [studyMode, setStudyMode] = useState<StudyMode>(() => readStudyMode())
   const [mediaEnabled, setMediaEnabled] = useState(() => readMediaEnabled())
   const [mediaEnabling, setMediaEnabling] = useState(false)
-  const [swipeHintPending, setSwipeHintPending] = useState(false)
+  const [welcomePending, setWelcomePending] = useState(() => readWelcomePending())
   const [mobileStudy, setMobileStudy] = useState(() => isMobileStudyDevice())
   const [feedPositions, setFeedPositions] = useState<FeedPositions>(() => readFeedPositions())
   const feedRef = useRef<HTMLElement>(null)
@@ -959,7 +977,8 @@ function App() {
     else if (!provider) setProvider('Google Classroom')
     writeMediaEnabled(false)
     setMediaEnabled(false)
-    setSwipeHintPending(false)
+    writeWelcomePending(true)
+    setWelcomePending(true)
     setMainView('feed')
     setScreen('feed')
     setActiveIndex(0)
@@ -986,7 +1005,8 @@ function App() {
     writeSession(false, null)
     writeMediaEnabled(false)
     setMediaEnabled(false)
-    setSwipeHintPending(false)
+    writeWelcomePending(false)
+    setWelcomePending(false)
     setProvider(null)
     setCompletedIds([])
     setAnsweredIds([])
@@ -1089,7 +1109,8 @@ function App() {
           window.setTimeout(() => {
             writeMediaEnabled(false)
             setMediaEnabled(false)
-            setSwipeHintPending(false)
+            writeWelcomePending(true)
+            setWelcomePending(true)
             setActiveIndex(0)
             restoreFeedRef.current = true
             setScreen('feed')
@@ -1161,7 +1182,7 @@ function App() {
   const feedItems = useMemo(() => {
     const items: FeedItem[] = []
 
-    if (!mediaEnabled) {
+    if (welcomePending) {
       items.push({ type: 'welcome' })
     }
 
@@ -1170,10 +1191,11 @@ function App() {
     if (showAssignmentCard) items.push({ type: 'assignment' })
     if (allPostsComplete) items.push({ type: 'complete' })
     return items
-  }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete, mediaEnabled])
+  }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete, welcomePending])
 
   const visibleFeedItems = useMemo(() => {
-    if (!mediaEnabled) {
+    // Must enable media before leaving the welcome card.
+    if (welcomePending && !mediaEnabled) {
       return feedItems.filter((item) => item.type === 'welcome')
     }
     for (let i = 0; i < feedItems.length; i++) {
@@ -1187,20 +1209,32 @@ function App() {
       }
     }
     return feedItems
-  }, [feedItems, answeredIds, mediaEnabled])
+  }, [feedItems, answeredIds, welcomePending, mediaEnabled])
 
-  const showSwipeHint = mobileStudy && swipeHintPending && mediaEnabled
   const activeFeedKeyRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (!swipeHintPending) return
-    if (activeIndex > 0) setSwipeHintPending(false)
-  }, [activeIndex, swipeHintPending])
 
   useEffect(() => {
     const item = visibleFeedItems[activeIndex]
     activeFeedKeyRef.current = item ? getFeedItemKey(item, activeIndex) : null
   }, [activeIndex, visibleFeedItems])
+
+  const dismissWelcome = () => {
+    if (!welcomePending) return
+    const nextIndex = Math.max(0, activeIndex - 1)
+    writeWelcomePending(false)
+    setWelcomePending(false)
+    setActiveIndex(nextIndex)
+    window.requestAnimationFrame(() => {
+      const slides = feedRef.current?.querySelectorAll<HTMLElement>('.feed-slide')
+      slides?.[nextIndex]?.scrollIntoView({ behavior: 'auto', block: 'start' })
+    })
+  }
+
+  useEffect(() => {
+    if (!welcomePending) return
+    const item = visibleFeedItems[activeIndex]
+    if (item && item.type !== 'welcome') dismissWelcome()
+  }, [activeIndex, visibleFeedItems, welcomePending])
 
   const pinFeedToKey = (key: string | null | undefined) => {
     if (!key) return
@@ -1239,7 +1273,7 @@ function App() {
   }, [visibleFeedItems.length, mediaEnabled])
 
   const enableSessionMedia = async () => {
-    if (mediaEnabling) return
+    if (mediaEnabling || mediaEnabled) return
     setMediaEnabling(true)
     markSessionAudioUnlocked()
     unlockSpeechSynthesis()
@@ -1250,12 +1284,12 @@ function App() {
     }
     writeMediaEnabled(true)
     setMediaEnabled(true)
-    setSwipeHintPending(mobileStudy)
     setMediaEnabling(false)
-    restoreFeedRef.current = true
+    // Stay on the welcome card — user swipes up when ready.
+    setActiveIndex(0)
     window.requestAnimationFrame(() => {
-      feedRef.current?.scrollTo({ top: 0 })
-      setActiveIndex(0)
+      const slides = feedRef.current?.querySelectorAll<HTMLElement>('.feed-slide')
+      slides?.[0]?.scrollIntoView({ behavior: 'auto', block: 'start' })
     })
   }
 
@@ -1284,7 +1318,7 @@ function App() {
 
     const savedKey = feedPositions[selectedClass]
     let targetIndex = 0
-    if (!mediaEnabled) {
+    if (welcomePending || !mediaEnabled) {
       targetIndex = 0
     } else if (savedKey) {
       const found = visibleFeedItems.findIndex((item, index) => (
@@ -1302,7 +1336,7 @@ function App() {
       setActiveIndex(targetIndex)
       restoreFeedRef.current = false
     })
-  }, [screen, mainView, selectedClass, visibleFeedItems.length, feedPositions, mediaEnabled])
+  }, [screen, mainView, selectedClass, visibleFeedItems.length, feedPositions, mediaEnabled, welcomePending])
 
   useEffect(() => {
     if (screen !== 'feed' || mainView !== 'feed' || restoreFeedRef.current) return
@@ -1643,23 +1677,34 @@ function App() {
                           ? 'Enable sound and the mic once so lessons can autoplay and quizzes can hear your answers.'
                           : 'Enable sound once so videos can play with audio as you move through the feed.'}
                       </p>
-                      <button
-                        type="button"
-                        className="welcome-session-btn"
-                        onClick={() => { void enableSessionMedia() }}
-                        disabled={mediaEnabling}
-                      >
-                        {mediaEnabling ? (
-                          <>
-                            <Loader2 size={18} className="passive-start-spinner" />
-                            Enabling…
-                          </>
-                        ) : passiveMode ? (
-                          'Enable sound and mic'
-                        ) : (
-                          'Enable sound'
-                        )}
-                      </button>
+                      {mediaEnabled ? (
+                        <p className="welcome-session-ready" role="status">
+                          {mobileStudy ? 'You\'re ready — swipe up to start.' : 'You\'re ready — go to the next card to start.'}
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          className="welcome-session-btn"
+                          onClick={() => { void enableSessionMedia() }}
+                          disabled={mediaEnabling}
+                        >
+                          {mediaEnabling ? (
+                            <>
+                              <Loader2 size={18} className="passive-start-spinner" />
+                              Enabling…
+                            </>
+                          ) : passiveMode ? (
+                            'Enable sound and mic'
+                          ) : (
+                            'Enable sound'
+                          )}
+                        </button>
+                      )}
+                      {mobileStudy && (
+                        <div className="swipe-up-hint is-in-card" aria-hidden="true">
+                          <span className="swipe-up-dot" />
+                        </div>
+                      )}
                     </div>
                   </article>
                 </div>
@@ -1806,12 +1851,6 @@ function App() {
             </div>
           )}
         </section>
-
-        {showSwipeHint && (
-          <div className="swipe-up-hint" aria-hidden="true">
-            <span className="swipe-up-dot" />
-          </div>
-        )}
 
         {visibleFeedItems.length > 1 && (
           <div className="feed-arrows">
