@@ -182,11 +182,11 @@ const generateSamples: GenerateSample[] = [
   },
 ]
 
-const classes = ['Prototyping', 'Systems', 'Social Lab']
+const classes = ['Systems', 'Prototyping', 'Social Lab']
 
 const classFilters = [
-  { id: 'Prototyping', label: 'Prototyping', Icon: PenTool },
   { id: 'Systems', label: 'Systems', Icon: Network },
+  { id: 'Prototyping', label: 'Prototyping', Icon: PenTool },
   { id: 'Social Lab', label: 'Social Lab', Icon: Users },
 ] as const
 
@@ -642,7 +642,7 @@ function App() {
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [uploadClass, setUploadClass] = useState(classes[0])
   const [uploadPrivacy, setUploadPrivacy] = useState<UploadPrivacy>('classmates')
-  const [uploadMode, setUploadMode] = useState<UploadMode>('video')
+  const [uploadMode, setUploadMode] = useState<UploadMode>('generate')
   const [uploadFileName, setUploadFileName] = useState('')
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
   const [uploadSampleId, setUploadSampleId] = useState<string | null>(null)
@@ -1626,8 +1626,8 @@ function App() {
           <div className="panel-tabs upload-tabs" role="tablist" aria-label="Upload type">
             {(
               [
-                { id: 'video', label: 'Video', Icon: Video },
                 { id: 'generate', label: 'Generate', Icon: FileText },
+                { id: 'video', label: 'Video', Icon: Video },
               ] as const
             ).map((tab) => (
               <button
