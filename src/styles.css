@@ -187,6 +187,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   overflow: hidden;
   background: #141414;
 }
+.build-badge {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 80;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  pointer-events: auto;
+}
+.build-badge:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.72);
+}
 .app-sidebar {
   width: 244px;
   flex-shrink: 0;

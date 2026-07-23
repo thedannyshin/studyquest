@@ -1809,6 +1809,16 @@ function App() {
         </div>,
         document.body,
       )}
+
+      <a
+        className="build-badge"
+        href={`https://github.com/thedannyshin/studyquest/commit/${__COMMIT_SHA__}`}
+        target="_blank"
+        rel="noreferrer"
+        title={`Build ${__COMMIT_COUNT__} · ${__COMMIT_SHA__}`}
+      >
+        {__COMMIT_COUNT__} · {__COMMIT_SHA__}
+      </a>
     </main>
   )
 }
