@@ -24,7 +24,7 @@ import {
   Plus,
   Send,
   FileText,
-  Folder,
+  Search,
   User,
   Users,
   Video,
@@ -70,6 +70,7 @@ type GenerateSample = {
   materialLabel: string
   materialType: string
   classCode: string
+  category: 'lecture' | 'reading'
   file: string
   video: string
 }
@@ -87,6 +88,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: '1/27 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'lecture',
     file: '/materials/1_27_Systems_Design.pdf',
     video: generateVideos[0],
   },
@@ -96,6 +98,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: '2/3 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'lecture',
     file: '/materials/2_3_Systems_Design.pdf',
     video: generateVideos[1],
   },
@@ -105,6 +108,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: '2/10 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'lecture',
     file: '/materials/2_10_Systems_Design.pdf',
     video: generateVideos[2],
   },
@@ -114,6 +118,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: '2/17 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'lecture',
     file: '/materials/2_17_Systems_Design.pdf',
     video: generateVideos[0],
   },
@@ -123,6 +128,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: '3/3 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'lecture',
     file: '/materials/3_3_Systems_Design.pdf',
     video: generateVideos[1],
   },
@@ -132,6 +138,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: '3/10 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'lecture',
     file: '/materials/3_10_Systems_Design.pdf',
     video: generateVideos[2],
   },
@@ -141,6 +148,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: '4/21 Systems Design',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'lecture',
     file: '/materials/4_21_Systems_Design.pdf',
     video: generateVideos[0],
   },
@@ -150,6 +158,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: 'Tools of Systems Thinkers',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'reading',
     file: '/materials/Tools_of_Systems_Thinkers.pdf',
     video: generateVideos[1],
   },
@@ -159,6 +168,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: 'Closing the Loop',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'reading',
     file: '/materials/Closing_the_Loop.pdf',
     video: generateVideos[2],
   },
@@ -168,6 +178,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: 'Thinking in Systems (Meadows)',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'reading',
     file: '/materials/Thinking_in_Systems_Meadows.pdf',
     video: generateVideos[0],
   },
@@ -177,6 +188,7 @@ const generateSamples: GenerateSample[] = [
     materialLabel: 'Object Modeling and Flow Diagramming',
     materialType: 'PDF',
     classCode: 'Systems',
+    category: 'reading',
     file: '/materials/Object_Modeling_and_Flow_Diagramming.pdf',
     video: generateVideos[1],
   },
@@ -647,6 +659,9 @@ function App() {
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
   const [uploadSampleId, setUploadSampleId] = useState<string | null>(null)
   const [uploadPickerOpen, setUploadPickerOpen] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState('')
+  const [pickerFilter, setPickerFilter] = useState<'all' | 'lecture' | 'reading'>('all')
+  const [pickerHighlightId, setPickerHighlightId] = useState<string | null>(null)
   const [uploadDragging, setUploadDragging] = useState(false)
   const [uploadGenerating, setUploadGenerating] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -756,6 +771,32 @@ function App() {
     [uploadSampleId],
   )
 
+  const filteredGenerateSamples = useMemo(() => {
+    const query = pickerSearch.trim().toLowerCase()
+    return generateSamples.filter((sample) => {
+      if (pickerFilter !== 'all' && sample.category !== pickerFilter) return false
+      if (!query) return true
+      const haystack = `${sample.materialLabel} ${sample.materialType} ${sample.classCode} ${sample.category} ${sample.file}`.toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [pickerSearch, pickerFilter])
+
+  const openUploadPicker = () => {
+    setPickerSearch('')
+    setPickerFilter('all')
+    setPickerHighlightId(uploadSampleId)
+    setUploadPickerOpen(true)
+  }
+
+  const confirmGenerateSample = () => {
+    const sample = generateSamples.find((item) => item.id === pickerHighlightId)
+    if (!sample) return
+    setUploadError('')
+    setUploadSampleId(sample.id)
+    setUploadClass(sample.classCode)
+    setUploadPickerOpen(false)
+  }
+
   const applyUploadFile = (file: File | undefined) => {
     if (!file || !file.type.startsWith('video/')) {
       setUploadError('Choose an MP4, WebM, or MOV video.')
@@ -788,13 +829,6 @@ function App() {
       setUploadFileName('')
     }
     probe.src = objectUrl
-  }
-
-  const selectGenerateSample = (sample: GenerateSample) => {
-    setUploadError('')
-    setUploadSampleId(sample.id)
-    setUploadClass(sample.classCode)
-    setUploadPickerOpen(false)
   }
 
   const switchUploadMode = (mode: UploadMode) => {
@@ -1714,7 +1748,7 @@ function App() {
                     <button
                       type="button"
                       className="upload-replace"
-                      onClick={() => setUploadPickerOpen(true)}
+                      onClick={openUploadPicker}
                     >
                       Change file
                     </button>
@@ -1723,7 +1757,7 @@ function App() {
                   <button
                     type="button"
                     className="upload-drop-trigger"
-                    onClick={() => setUploadPickerOpen(true)}
+                    onClick={openUploadPicker}
                   >
                     <span className="upload-pick">
                       <FileText size={28} strokeWidth={2} />
@@ -1895,59 +1929,108 @@ function App() {
             className="upload-picker-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Open materials"
+            aria-label="Choose material"
             onClick={(event) => event.stopPropagation()}
           >
-            <header className="upload-picker-titlebar">
-              <strong>Open</strong>
+            <header className="upload-picker-header">
+              <div>
+                <strong>Choose material</strong>
+                <p>Select a class PDF for StudyQuest AI to turn into a video.</p>
+              </div>
               <button type="button" aria-label="Close" onClick={() => setUploadPickerOpen(false)}>
-                <X size={16} strokeWidth={2.2} />
+                <X size={18} strokeWidth={2.2} />
               </button>
             </header>
 
-            <div className="upload-picker-path" aria-label="Current folder">
-              <Folder size={14} strokeWidth={2.2} aria-hidden="true" />
-              <span>Materials</span>
-              <ChevronRight size={12} strokeWidth={2.4} aria-hidden="true" />
-              <span>Systems</span>
-            </div>
+            <label className="upload-picker-search">
+              <Search size={16} strokeWidth={2.2} aria-hidden="true" />
+              <input
+                type="search"
+                value={pickerSearch}
+                onChange={(event) => setPickerSearch(event.target.value)}
+                placeholder="Search materials"
+                autoFocus
+              />
+            </label>
 
-            <div className="upload-picker-columns" aria-hidden="true">
-              <span className="upload-picker-col-name">Name</span>
-              <span className="upload-picker-col-kind">Kind</span>
-              <span className="upload-picker-col-class">Class</span>
+            <div className="upload-picker-filters" role="tablist" aria-label="Filter materials">
+              {([
+                { id: 'all', label: 'All' },
+                { id: 'lecture', label: 'Lectures' },
+                { id: 'reading', label: 'Readings' },
+              ] as const).map((filter) => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={pickerFilter === filter.id}
+                  className={pickerFilter === filter.id ? 'active' : ''}
+                  onClick={() => setPickerFilter(filter.id)}
+                >
+                  {filter.label}
+                </button>
+              ))}
             </div>
 
             <ul className="upload-picker-list" role="listbox" aria-label="Materials">
-              {generateSamples.map((sample) => {
-                const fileName = sample.file.split('/').pop() ?? sample.materialLabel
-                return (
-                  <li key={sample.id} role="option" aria-selected={uploadSampleId === sample.id}>
-                    <button
-                      type="button"
-                      className={uploadSampleId === sample.id ? 'active' : ''}
-                      onClick={() => selectGenerateSample(sample)}
-                    >
-                      <span className="upload-picker-icon" aria-hidden="true">
-                        <FileText size={16} strokeWidth={2} />
-                      </span>
-                      <span className="upload-picker-col-name">
-                        <strong>{sample.materialLabel}</strong>
-                        <em>{fileName}</em>
-                      </span>
-                      <span className="upload-picker-col-kind">{sample.materialType}</span>
-                      <span className="upload-picker-col-class">{sample.classCode}</span>
-                    </button>
-                  </li>
-                )
-              })}
+              {filteredGenerateSamples.length === 0 ? (
+                <li className="upload-picker-empty">No materials match that search.</li>
+              ) : (
+                filteredGenerateSamples.map((sample) => {
+                  const selected = pickerHighlightId === sample.id
+                  return (
+                    <li key={sample.id} role="option" aria-selected={selected}>
+                      <button
+                        type="button"
+                        className={selected ? 'active' : ''}
+                        onClick={() => setPickerHighlightId(sample.id)}
+                        onDoubleClick={() => {
+                          setUploadError('')
+                          setUploadSampleId(sample.id)
+                          setUploadClass(sample.classCode)
+                          setUploadPickerOpen(false)
+                        }}
+                      >
+                        <span className="upload-picker-icon" aria-hidden="true">
+                          <FileText size={18} strokeWidth={2} />
+                        </span>
+                        <span className="upload-picker-copy">
+                          <strong>{sample.materialLabel}</strong>
+                          <span>
+                            {sample.materialType}
+                            {' · '}
+                            {sample.category === 'lecture' ? 'Lecture' : 'Reading'}
+                            {' · '}
+                            {sample.classCode}
+                          </span>
+                        </span>
+                        <span className={`upload-picker-check${selected ? ' is-on' : ''}`} aria-hidden="true">
+                          {selected ? <Check size={14} strokeWidth={2.6} /> : null}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })
+              )}
             </ul>
 
             <footer className="upload-picker-footer">
-              <span>{generateSamples.length} items</span>
-              <button type="button" onClick={() => setUploadPickerOpen(false)}>
-                Cancel
-              </button>
+              <span className="upload-picker-count">
+                {pickerHighlightId ? '1 selected' : `${filteredGenerateSamples.length} materials`}
+              </span>
+              <div className="upload-picker-actions">
+                <button type="button" className="upload-picker-cancel" onClick={() => setUploadPickerOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="upload-picker-confirm"
+                  disabled={!pickerHighlightId}
+                  onClick={confirmGenerateSample}
+                >
+                  Use material
+                </button>
+              </div>
             </footer>
           </div>
         </div>,
