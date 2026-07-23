@@ -459,6 +459,7 @@ const commentSeeds = [
 ]
 
 const SESSION_KEY = 'study-quest-session'
+const PROFILE_KEY = 'study-quest-profile'
 const SAVED_KEY = 'study-quest-saved'
 const PROGRESS_KEY = 'study-quest-progress'
 const ANSWERED_KEY = 'study-quest-answered'
@@ -479,9 +480,34 @@ type FeedItem =
   | { type: 'complete' }
   | { type: 'welcome' }
 const PROFILE_PHOTO = 'https://randomuser.me/api/portraits/women/68.jpg'
-const PROFILE_NAME = 'Alex Morgan'
-const PROFILE_EMAIL = 'alex@cca.edu'
 const PROFILE_SCHOOL = 'California College of the Arts'
+
+type UserProfile = {
+  name: string
+  email: string
+}
+
+function readProfile(): UserProfile {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY)
+    if (!raw) return { name: '', email: '' }
+    const data = JSON.parse(raw) as Partial<UserProfile>
+    return {
+      name: typeof data.name === 'string' ? data.name.trim() : '',
+      email: typeof data.email === 'string' ? data.email.trim() : '',
+    }
+  } catch {
+    return { name: '', email: '' }
+  }
+}
+
+function writeProfile(profile: UserProfile) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
+}
+
+function clearProfile() {
+  localStorage.removeItem(PROFILE_KEY)
+}
 
 function formatPosterName(name: string) {
   const parts = name.trim().split(/\s+/)
@@ -489,11 +515,11 @@ function formatPosterName(name: string) {
   return `${parts[0]} ${parts[parts.length - 1][0]}`
 }
 
-function getVideoAttribution(postedBy?: string) {
+function getVideoAttribution(postedBy: string | undefined, currentUserName: string) {
   if (!postedBy || postedBy === 'StudyQuest AI') {
     return 'StudyQuest AI generated this video'
   }
-  if (postedBy === PROFILE_NAME) {
+  if (currentUserName && postedBy === currentUserName) {
     return 'You posted this video'
   }
   return `${formatPosterName(postedBy)} posted this video`
@@ -744,6 +770,9 @@ function App() {
   const [mediaEnabled, setMediaEnabled] = useState(() => readMediaEnabled())
   const [mediaEnabling, setMediaEnabling] = useState(false)
   const [welcomePending, setWelcomePending] = useState(() => readWelcomePending())
+  const initialProfile = useMemo(() => readProfile(), [])
+  const [profileName, setProfileName] = useState(initialProfile.name)
+  const [profileEmail, setProfileEmail] = useState(initialProfile.email)
   const [mobileStudy, setMobileStudy] = useState(() => isMobileStudyDevice())
   const [feedPositions, setFeedPositions] = useState<FeedPositions>(() => readFeedPositions())
   const feedRef = useRef<HTMLElement>(null)
@@ -1002,11 +1031,14 @@ function App() {
 
   const logOut = () => {
     clearProgressStorage()
+    clearProfile()
     writeSession(false, null)
     writeMediaEnabled(false)
     setMediaEnabled(false)
     writeWelcomePending(false)
     setWelcomePending(false)
+    setProfileName('')
+    setProfileEmail('')
     setProvider(null)
     setCompletedIds([])
     setAnsweredIds([])
@@ -1079,7 +1111,7 @@ function App() {
         sourceLabel: 'Your upload',
         video: videoUrl,
         privacy,
-        postedBy: PROFILE_NAME,
+        postedBy: profileName || 'You',
       },
       ...current,
     ])
@@ -1088,8 +1120,24 @@ function App() {
     setMainView('feed')
   }
 
-  const submitAuth = (event: FormEvent) => {
+  const submitAuth = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const email = String(form.get('email') ?? '').trim()
+    const nameInput = String(form.get('name') ?? '').trim()
+    const existing = readProfile()
+    const nextName = authMode === 'signup'
+      ? nameInput
+      : (existing.email.toLowerCase() === email.toLowerCase() && existing.name
+        ? existing.name
+        : email.split('@')[0] || 'Student')
+
+    if (!email || (authMode === 'signup' && !nextName)) return
+
+    writeProfile({ name: nextName, email })
+    setProfileName(nextName)
+    setProfileEmail(email)
+
     if (authMode === 'signup') setScreen('connect')
     else goToFeed()
   }
@@ -1431,16 +1479,16 @@ function App() {
             {authMode === 'signup' && (
               <label>
                 Name
-                <input required placeholder="Alex Morgan" />
+                <input name="name" required autoComplete="name" placeholder="Your name" />
               </label>
             )}
             <label>
               Email
-              <input required type="email" placeholder="alex@cca.edu" />
+              <input name="email" required type="email" autoComplete="email" placeholder="you@school.edu" />
             </label>
             <label>
               Password
-              <input required type="password" placeholder="Password" minLength={8} />
+              <input name="password" required type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} placeholder="Password" minLength={8} />
             </label>
             <button className="primary-button" type="submit">
               {authMode === 'signup' ? 'Continue' : 'Log in'}
@@ -1814,6 +1862,7 @@ function App() {
                   post={item.post}
                   sourceUrl={sourceUrl}
                   sourceProvider={providerLabel}
+                  currentUserName={profileName}
                   active={index === activeIndex}
                   passive={passiveMode}
                   commentsOpen={commentsOpen && index === activeIndex}
@@ -2113,10 +2162,10 @@ function App() {
         <section className="panel-view" aria-label="Profile">
           <p className="mobile-page-title">Profile</p>
           <header className="panel-header profile-header">
-            <img className="profile-avatar" src={PROFILE_PHOTO} alt={PROFILE_NAME} />
+            <img className="profile-avatar" src={PROFILE_PHOTO} alt={profileName || 'Profile'} />
             <div className="profile-identity">
-              <h1>{PROFILE_NAME}</h1>
-              <p>{PROFILE_EMAIL}</p>
+              <h1>{profileName || 'Student'}</h1>
+              <p>{profileEmail || 'No email on file'}</p>
               <p className="profile-school">{PROFILE_SCHOOL}</p>
             </div>
           </header>
@@ -2361,6 +2410,7 @@ function PostCard({
   post,
   sourceUrl,
   sourceProvider,
+  currentUserName,
   active,
   passive,
   commentsOpen,
@@ -2380,6 +2430,7 @@ function PostCard({
   post: Post
   sourceUrl: string
   sourceProvider: string
+  currentUserName: string
   active: boolean
   passive: boolean
   commentsOpen: boolean
@@ -2832,7 +2883,7 @@ function PostCard({
     setComments((current) => [
       ...current,
       {
-        name: 'Alex Morgan',
+        name: currentUserName || 'You',
         text,
         time: 'now',
         avatar: 'https://randomuser.me/api/portraits/women/68.jpg',
@@ -2956,7 +3007,7 @@ function PostCard({
               {creditOpen && (
                 <div className="post-credit-tip">
                   {post.modality === 'video' && (
-                    <p>{getVideoAttribution(post.postedBy)}</p>
+                    <p>{getVideoAttribution(post.postedBy, currentUserName)}</p>
                   )}
                   <p className="post-credit-meta">
                     Source:{' '}
@@ -2966,7 +3017,7 @@ function PostCard({
                       <a href={sourceUrl} target="_blank" rel="noreferrer">
                         {sourceProvider}
                       </a>
-                    ) : post.postedBy === PROFILE_NAME ? (
+                    ) : currentUserName && post.postedBy === currentUserName ? (
                       'Your upload'
                     ) : (
                       post.postedBy
