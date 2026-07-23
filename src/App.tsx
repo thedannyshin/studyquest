@@ -7,6 +7,15 @@ import {
   shouldDeferVideoAutoplay,
 } from './videoAudio'
 import {
+  buildQuizSpeech,
+  canListenForQuiz,
+  canSpeakQuiz,
+  speakText,
+  startListeningForOption,
+  stopSpeaking,
+  warmUpSpeechRecognition,
+} from './voiceQuiz'
+import {
   ArrowLeft,
   BookOpen,
   Bookmark,
@@ -1377,6 +1386,7 @@ function App() {
             aria-pressed={studyMode === 'passive'}
             onClick={() => {
               markSessionAudioUnlocked()
+              warmUpSpeechRecognition()
               setStudyMode('passive')
             }}
           >
@@ -2195,9 +2205,11 @@ function PostCard({
   const [classOpen, setClassOpen] = useState(false)
   const [quizInputActive, setQuizInputActive] = useState(false)
   const [autoNextArmed, setAutoNextArmed] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'speaking' | 'listening' | 'unsupported'>('idle')
   const recordedRef = useRef(Boolean(savedQuizAnswer))
   const activeRef = useRef(active)
   const onNextRef = useRef(onNext)
+  const chooseOptionRef = useRef<(option: string) => void>(() => {})
   onNextRef.current = onNext
   activeRef.current = active
 
@@ -2298,6 +2310,71 @@ function PostCard({
     const timer = window.setTimeout(() => onNextRef.current(), 1400)
     return () => window.clearTimeout(timer)
   }, [passive, active, post.modality, displaySubmitted, hasNext, post.id])
+
+  useEffect(() => {
+    if (!passive || post.modality !== 'drill' || !quiz || quiz.type !== 'multiple-choice') {
+      stopSpeaking()
+      setVoiceStatus('idle')
+      return
+    }
+    if (!active || displaySubmitted || !quiz.options?.length) {
+      stopSpeaking()
+      setVoiceStatus('idle')
+      return
+    }
+
+    let cancelled = false
+    let stopListening: (() => void) | null = null
+
+    const run = async () => {
+      if (!canSpeakQuiz() && !canListenForQuiz()) {
+        setVoiceStatus('unsupported')
+        return
+      }
+
+      setVoiceStatus('speaking')
+      await speakText(buildQuizSpeech(quiz.question, quiz.options ?? []))
+      if (cancelled || !activeRef.current) return
+
+      if (!canListenForQuiz()) {
+        setVoiceStatus('unsupported')
+        return
+      }
+
+      setVoiceStatus('listening')
+      stopListening = startListeningForOption(
+        quiz.options ?? [],
+        (option) => {
+          if (cancelled || !activeRef.current) return
+          chooseOptionRef.current(option)
+        },
+        (status) => {
+          if (cancelled) return
+          if (status === 'listening') setVoiceStatus('listening')
+          if (status === 'error') setVoiceStatus('unsupported')
+        },
+      )
+    }
+
+    void run()
+
+    return () => {
+      cancelled = true
+      stopSpeaking()
+      stopListening?.()
+      setVoiceStatus('idle')
+    }
+  }, [passive, active, post.modality, post.id, displaySubmitted, quiz])
+
+  useEffect(() => {
+    if (!passive || !displaySubmitted || !quiz || quiz.type !== 'multiple-choice') return
+    stopSpeaking()
+    const line = displayCorrect
+      ? 'Correct.'
+      : `Incorrect. The answer is ${quiz.answer}.`
+    void speakText(line, 1.05)
+    return () => stopSpeaking()
+  }, [passive, displaySubmitted, displayCorrect, quiz, post.id])
 
   useEffect(() => {
     if (post.modality !== 'video') return
@@ -2501,6 +2578,7 @@ function PostCard({
     markResult(isCorrect)
     if (isCorrect) setCompleted(true)
   }
+  chooseOptionRef.current = chooseOption
 
   const addComment = (event: FormEvent) => {
     event.preventDefault()
@@ -2773,6 +2851,19 @@ function PostCard({
             </div>
           ) : (
             <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}${showContinueHint ? ' has-continue-hint' : ''}`}>
+              {passive && (
+                <p className="passive-voice-status" role="status">
+                  {displaySubmitted
+                    ? (displayCorrect ? 'Correct' : 'Incorrect')
+                    : voiceStatus === 'speaking'
+                      ? 'Reading question…'
+                      : voiceStatus === 'listening'
+                        ? 'Listening… say A, B, C, or D'
+                        : voiceStatus === 'unsupported'
+                          ? 'Voice unavailable — tap an answer'
+                          : 'Get ready'}
+                </p>
+              )}
               <div className="quiz-header">
                 <h2>{title}</h2>
               </div>
