@@ -1190,11 +1190,53 @@ function App() {
   }, [feedItems, answeredIds, mediaEnabled])
 
   const showSwipeHint = mobileStudy && swipeHintPending && mediaEnabled
+  const activeFeedKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!swipeHintPending) return
     if (activeIndex > 0) setSwipeHintPending(false)
   }, [activeIndex, swipeHintPending])
+
+  useEffect(() => {
+    const item = visibleFeedItems[activeIndex]
+    activeFeedKeyRef.current = item ? getFeedItemKey(item, activeIndex) : null
+  }, [activeIndex, visibleFeedItems])
+
+  const pinFeedToKey = (key: string | null | undefined) => {
+    if (!key) return
+    const root = feedRef.current
+    if (!root) return
+    const slides = Array.from(root.querySelectorAll<HTMLElement>('.feed-slide'))
+    let target: HTMLElement | null = null
+    let index = -1
+
+    if (key.startsWith('post-')) {
+      const postId = key.slice(5)
+      target = root.querySelector(`#lesson-${postId}`)?.closest('.feed-slide') as HTMLElement | null
+      index = target ? slides.indexOf(target) : -1
+    } else {
+      index = visibleFeedItems.findIndex((item, itemIndex) => (
+        getFeedItemKey(item, itemIndex) === key
+      ))
+      target = index >= 0 ? slides[index] ?? null : null
+    }
+
+    if (!target || index < 0) return
+    target.scrollIntoView({ behavior: 'auto', block: 'start' })
+    setActiveIndex(index)
+  }
+
+  const pinFeedToPost = (postId: number) => {
+    pinFeedToKey(`post-${postId}`)
+  }
+
+  // Answering a quiz unlocks later slides; keep the answered card locked in view.
+  useEffect(() => {
+    if (!mediaEnabled || restoreFeedRef.current) return
+    const key = activeFeedKeyRef.current
+    if (!key?.startsWith('post-')) return
+    window.requestAnimationFrame(() => pinFeedToKey(key))
+  }, [visibleFeedItems.length, mediaEnabled])
 
   const enableSessionMedia = async () => {
     if (mediaEnabling) return
@@ -1737,6 +1779,7 @@ function App() {
                   savedQuizAnswer={quizResponses[item.post.id] ?? null}
                   onSaveQuizAnswer={(response) => saveQuizResponse(item.post.id, response)}
                   onNext={() => scrollFeed(1)}
+                  onPinFeed={() => pinFeedToPost(item.post.id)}
                   hasNext={index < visibleFeedItems.length - 1}
                   saved={savedIds.includes(item.post.id)}
                   onToggleSave={() => toggleSaved(item.post.id)}
@@ -2289,6 +2332,7 @@ function PostCard({
   savedQuizAnswer,
   onSaveQuizAnswer,
   onNext,
+  onPinFeed,
   hasNext,
   saved,
   onToggleSave,
@@ -2307,6 +2351,7 @@ function PostCard({
   savedQuizAnswer: string | null
   onSaveQuizAnswer: (response: string) => void
   onNext: () => void
+  onPinFeed: () => void
   hasNext: boolean
   saved: boolean
   onToggleSave: () => void
@@ -2736,6 +2781,8 @@ function PostCard({
     onSaveQuizAnswer(option)
     markResult(isCorrect)
     if (isCorrect) setCompleted(true)
+    // Taps can nudge scroll-snap onto the previous card — pin this quiz in place.
+    window.requestAnimationFrame(() => onPinFeed())
   }
   chooseOptionRef.current = chooseOption
 
@@ -2780,7 +2827,14 @@ function PostCard({
                     displaySubmitted && isChosen && !displayCorrect ? 'wrong' : '',
                     isIrrelevant ? 'dim' : '',
                   ].join(' ')}
-                  onClick={() => chooseOption(option)}
+                  onPointerDown={(event) => {
+                    // Keep the feed from treating this tap as a swipe.
+                    event.stopPropagation()
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    chooseOption(option)
+                  }}
                 >
                   <span>{String.fromCharCode(65 + index)}</span>{option}
                   {displaySubmitted && isCorrectOption && <Check size={17} />}
