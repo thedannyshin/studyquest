@@ -422,8 +422,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   color: rgba(255,255,255,.7);
   font-size: 14px;
   font-weight: 700;
-  background:
-    linear-gradient(160deg, #2a2a2a 0%, #111 55%, #000 100%);
+  background: #1a1a1a;
 }
 .media-badge {
   position: absolute;
@@ -1058,9 +1057,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     calc(56px + env(safe-area-inset-top))
     22px
     calc(28px + env(safe-area-inset-bottom));
-  background:
-    radial-gradient(ellipse at 50% 32%, rgba(255,255,255,.08), transparent 55%),
-    linear-gradient(180deg, #171717 0%, #0a0a0a 58%, #050505 100%);
+  background: #0a0a0a;
 }
 .passive-meta {
   display: grid;
@@ -1159,9 +1156,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
     calc(18px + env(safe-area-inset-bottom));
   gap: 18px;
   justify-content: stretch;
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.06), transparent 45%),
-    #0a0a0a;
+  background: #0a0a0a;
 }
 .quiz-stack.is-passive-quiz.has-continue-hint {
   padding-bottom: calc(58px + env(safe-area-inset-bottom));
@@ -1797,9 +1792,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
 }
 .post-frame.welcome-session {
   position: relative;
-  background:
-    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.07), transparent 52%),
-    linear-gradient(180deg, #141414 0%, #0a0a0a 55%, #050505 100%);
+  background: #0a0a0a;
 }
 .welcome-session-content {
   height: 100%;
@@ -1892,7 +1885,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   bottom: 4px;
   width: 2px;
   border-radius: 999px;
-  background: linear-gradient(180deg, transparent, rgba(242, 242, 242, 0.35));
+  background: rgba(242, 242, 242, 0.35);
   transform: translateX(-50%);
 }
 .swipe-up-dot {
