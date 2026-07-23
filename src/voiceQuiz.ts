@@ -484,6 +484,23 @@ export function warmUpSpeechRecognition() {
   }
 }
 
+/** Ask for mic permission inside a tap (needed for spoken quiz answers). */
+export async function requestMicrophoneAccess() {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+    warmUpSpeechRecognition()
+    return false
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    stream.getTracks().forEach((track) => track.stop())
+    warmUpSpeechRecognition()
+    return true
+  } catch {
+    warmUpSpeechRecognition()
+    return false
+  }
+}
+
 export function startListeningForOption(
   options: string[],
   onMatch: (option: string) => void,

@@ -14,6 +14,7 @@ import {
   getVoiceSession,
   isAudioSessionUnlocked,
   prefetchQuizAudio,
+  requestMicrophoneAccess,
   speakQuiz,
   speakText,
   startListeningForOption,
@@ -35,6 +36,7 @@ import {
   Link,
   Menu,
   MessageCircle,
+  Mic,
   Network,
   Pause,
   PenTool,
@@ -468,11 +470,14 @@ const LAST_FEED_CLASS_KEY = 'study-quest-feed-class'
 
 type QuizResponses = Record<number, string>
 type FeedPositions = Record<string, string>
+const MEDIA_ENABLED_KEY = 'study-quest-media-enabled'
+
 type FeedItem =
   | { type: 'due'; items: (typeof upcomingItems)[number][] }
   | { type: 'assignment' }
   | { type: 'post'; post: Post }
   | { type: 'complete' }
+  | { type: 'enable' }
 const PROFILE_PHOTO = 'https://randomuser.me/api/portraits/women/68.jpg'
 const PROFILE_NAME = 'Alex Morgan'
 const PROFILE_EMAIL = 'alex@cca.edu'
@@ -655,11 +660,29 @@ function readLastFeedClass() {
   }
 }
 
+function readMediaEnabled() {
+  try {
+    return sessionStorage.getItem(MEDIA_ENABLED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeMediaEnabled(enabled: boolean) {
+  try {
+    if (enabled) sessionStorage.setItem(MEDIA_ENABLED_KEY, '1')
+    else sessionStorage.removeItem(MEDIA_ENABLED_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 function getFeedItemKey(item: FeedItem, index: number) {
   if (item.type === 'post') return `post-${item.post.id}`
   if (item.type === 'due') return 'due-board'
   if (item.type === 'complete') return 'feed-complete'
   if (item.type === 'assignment') return 'assignment'
+  if (item.type === 'enable') return 'session-enable'
   return `slide-${index}`
 }
 
@@ -701,6 +724,8 @@ function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showAllDues, setShowAllDues] = useState(false)
   const [studyMode, setStudyMode] = useState<StudyMode>(() => readStudyMode())
+  const [mediaEnabled, setMediaEnabled] = useState(() => readMediaEnabled())
+  const [mediaEnabling, setMediaEnabling] = useState(false)
   const [mobileStudy, setMobileStudy] = useState(() => isMobileStudyDevice())
   const [feedPositions, setFeedPositions] = useState<FeedPositions>(() => readFeedPositions())
   const feedRef = useRef<HTMLElement>(null)
@@ -1121,14 +1146,21 @@ function App() {
   const feedItems = useMemo(() => {
     const items: FeedItem[] = []
 
+    if (passiveMode && !mediaEnabled) {
+      items.push({ type: 'enable' })
+    }
+
     visiblePosts.forEach((post) => items.push({ type: 'post', post }))
     if (allPostsComplete && visibleDues.length > 0) items.push({ type: 'due', items: visibleDues })
     if (showAssignmentCard) items.push({ type: 'assignment' })
     if (allPostsComplete) items.push({ type: 'complete' })
     return items
-  }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete])
+  }, [visibleDues, showAssignmentCard, visiblePosts, allPostsComplete, passiveMode, mediaEnabled])
 
   const visibleFeedItems = useMemo(() => {
+    if (passiveMode && !mediaEnabled) {
+      return feedItems.filter((item) => item.type === 'enable')
+    }
     for (let i = 0; i < feedItems.length; i++) {
       const item = feedItems[i]
       if (
@@ -1140,7 +1172,23 @@ function App() {
       }
     }
     return feedItems
-  }, [feedItems, answeredIds])
+  }, [feedItems, answeredIds, passiveMode, mediaEnabled])
+
+  const enableSessionMedia = async () => {
+    if (mediaEnabling) return
+    setMediaEnabling(true)
+    markSessionAudioUnlocked()
+    unlockSpeechSynthesis()
+    await requestMicrophoneAccess()
+    writeMediaEnabled(true)
+    setMediaEnabled(true)
+    setMediaEnabling(false)
+    restoreFeedRef.current = true
+    setActiveIndex(0)
+    window.requestAnimationFrame(() => {
+      feedRef.current?.scrollTo({ top: 0 })
+    })
+  }
 
   useEffect(() => {
     if (selectedClass !== 'All' && !classesWithPosts.has(selectedClass)) {
@@ -1392,10 +1440,13 @@ function App() {
             className={studyMode === 'passive' ? 'active' : ''}
             aria-pressed={studyMode === 'passive'}
             onClick={() => {
-              markSessionAudioUnlocked()
-              unlockSpeechSynthesis()
-              warmUpSpeechRecognition()
               setStudyMode('passive')
+              // Re-prime audio if this browser session already enabled media.
+              if (mediaEnabled) {
+                markSessionAudioUnlocked()
+                unlockSpeechSynthesis()
+                warmUpSpeechRecognition()
+              }
             }}
           >
             <Headphones size={14} strokeWidth={2.2} />
@@ -1501,10 +1552,41 @@ function App() {
                     ? 'due-board'
                     : item.type === 'complete'
                       ? 'feed-complete'
-                      : `assignment-${index}`
+                      : item.type === 'enable'
+                        ? 'session-enable'
+                        : `assignment-${index}`
               }
             >
-              {item.type === 'due' ? (
+              {item.type === 'enable' ? (
+                <div className="tiktok-row">
+                  <article className="post-frame enable-session is-passive">
+                    <div className="enable-session-content">
+                      <p className="enable-session-kicker">Passive mode</p>
+                      <h2>Enable sound &amp; mic</h2>
+                      <p>
+                        Tap play once so lessons can autoplay and quizzes can listen for your answers.
+                      </p>
+                      <div className="enable-session-icons" aria-hidden="true">
+                        <span><Headphones size={18} strokeWidth={2.2} /> Sound</span>
+                        <span><Mic size={18} strokeWidth={2.2} /> Microphone</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="passive-play-btn enable-session-play"
+                        onClick={() => { void enableSessionMedia() }}
+                        disabled={mediaEnabling}
+                        aria-label="Enable sound and microphone"
+                      >
+                        {mediaEnabling ? (
+                          <Loader2 size={30} className="passive-start-spinner" />
+                        ) : (
+                          <Play size={30} fill="currentColor" />
+                        )}
+                      </button>
+                    </div>
+                  </article>
+                </div>
+              ) : item.type === 'due' ? (
                 <div className="tiktok-row">
                   <article className="post-frame due">
                     <div className="due-panel">

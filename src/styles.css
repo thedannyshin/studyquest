@@ -1793,6 +1793,66 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f2f2f2; outline-
   opacity: .35;
   cursor: default;
 }
+.post-frame.enable-session {
+  background:
+    radial-gradient(ellipse at 50% 32%, rgba(255,255,255,.08), transparent 55%),
+    linear-gradient(180deg, #171717 0%, #0a0a0a 58%, #050505 100%);
+}
+.enable-session-content {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 14px;
+  padding:
+    calc(72px + env(safe-area-inset-top))
+    22px
+    calc(36px + env(safe-area-inset-bottom));
+}
+.enable-session-kicker {
+  margin: 0;
+  color: #8a8a8a;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.enable-session-content h2 {
+  margin: 0;
+  max-width: 10em;
+  font-size: clamp(32px, 9vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -.05em;
+  font-weight: 800;
+  color: #f2f2f2;
+}
+.enable-session-content > p {
+  margin: 0;
+  max-width: 18em;
+  color: #9a9a9a;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.enable-session-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 4px 0 8px;
+  color: #cfcfcf;
+  font-size: 13px;
+  font-weight: 600;
+}
+.enable-session-icons span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.enable-session-play {
+  margin-top: 12px;
+  justify-self: center;
+  width: 100%;
+  max-width: 88px;
+}
 .assignment-content {
   height: 100%;
   display: grid;
