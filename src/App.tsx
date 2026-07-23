@@ -7,9 +7,9 @@ import {
   shouldDeferVideoAutoplay,
 } from './videoAudio'
 import {
-  buildQuizSpeech,
   canListenForQuiz,
   canSpeakQuiz,
+  speakQuiz,
   speakText,
   startListeningForOption,
   stopSpeaking,
@@ -2327,6 +2327,7 @@ function PostCard({
 
     let cancelled = false
     let stopListening: (() => void) | null = null
+    let started = false
 
     const run = async () => {
       if (!canSpeakQuiz() && !canListenForQuiz()) {
@@ -2334,8 +2335,9 @@ function PostCard({
         return
       }
 
+      started = true
       setVoiceStatus('speaking')
-      await speakText(buildQuizSpeech(quiz.question, quiz.options ?? []))
+      await speakQuiz(quiz.question, quiz.options ?? [])
       if (cancelled || !activeRef.current) return
 
       if (!canListenForQuiz()) {
@@ -2358,20 +2360,33 @@ function PostCard({
       )
     }
 
-    // Delay so React Strict Mode remounts don't cancel speech immediately,
-    // and so the Passive unlock utterance can finish first.
+    // Debounce so scroll settling / Strict Mode remounts don't cancel mid-speak.
     const startTimer = window.setTimeout(() => {
       if (!cancelled) void run()
-    }, 450)
+    }, 700)
 
     return () => {
       cancelled = true
       window.clearTimeout(startTimer)
-      stopSpeaking()
       stopListening?.()
-      setVoiceStatus('idle')
+      if (started) stopSpeaking()
+      setVoiceStatus((current) => (current === 'listening' || current === 'speaking' ? 'idle' : current))
     }
   }, [passive, active, post.modality, post.id, displaySubmitted, quiz])
+
+  const replayQuizSpeech = () => {
+    if (!quiz?.options?.length || displaySubmitted) return
+    unlockSpeechSynthesis()
+    setVoiceStatus('speaking')
+    void speakQuiz(quiz.question, quiz.options).then(() => {
+      if (!activeRef.current || displaySubmitted) return
+      if (!canListenForQuiz()) {
+        setVoiceStatus('unsupported')
+        return
+      }
+      setVoiceStatus('listening')
+    })
+  }
 
   useEffect(() => {
     if (!passive || !active || !displaySubmitted || !quiz || quiz.type !== 'multiple-choice') return
@@ -2863,17 +2878,28 @@ function PostCard({
           ) : (
             <div className={`quiz-stack${passive ? ' is-passive-quiz' : ''}${showContinueHint ? ' has-continue-hint' : ''}`}>
               {passive && (
-                <p className="passive-voice-status" role="status">
-                  {displaySubmitted
-                    ? (displayCorrect ? 'Correct' : 'Incorrect')
-                    : voiceStatus === 'speaking'
-                      ? 'Reading question…'
-                      : voiceStatus === 'listening'
-                        ? 'Listening… say A, B, C, or D'
-                        : voiceStatus === 'unsupported'
-                          ? 'Voice unavailable — tap an answer'
-                          : 'Get ready'}
-                </p>
+                <div className="passive-voice-bar">
+                  <p className="passive-voice-status" role="status">
+                    {displaySubmitted
+                      ? (displayCorrect ? 'Correct' : 'Incorrect')
+                      : voiceStatus === 'speaking'
+                        ? 'Reading question…'
+                        : voiceStatus === 'listening'
+                          ? 'Listening… say A, B, C, or D'
+                          : voiceStatus === 'unsupported'
+                            ? 'Voice unavailable — tap an answer'
+                            : 'Get ready'}
+                  </p>
+                  {!displaySubmitted && canSpeakQuiz() && (
+                    <button
+                      type="button"
+                      className="passive-hear-btn"
+                      onClick={replayQuizSpeech}
+                    >
+                      Hear question
+                    </button>
+                  )}
+                </div>
               )}
               <div className="quiz-header">
                 <h2>{title}</h2>

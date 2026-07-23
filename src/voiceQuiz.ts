@@ -42,68 +42,59 @@ export function canListenForQuiz() {
 }
 
 let speechUnlocked = false
-let voicesReady: Promise<SpeechSynthesisVoice[]> | null = null
+let speakToken = 0
+let cachedVoice: SpeechSynthesisVoice | null = null
 
-function waitForVoices() {
-  if (!canSpeakQuiz()) return Promise.resolve([] as SpeechSynthesisVoice[])
-  if (voicesReady) return voicesReady
-
-  voicesReady = new Promise((resolve) => {
-    const existing = window.speechSynthesis.getVoices()
-    if (existing.length > 0) {
-      resolve(existing)
-      return
-    }
-
-    const finish = () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', finish)
-      resolve(window.speechSynthesis.getVoices())
-    }
-
-    window.speechSynthesis.addEventListener('voiceschanged', finish)
-    window.setTimeout(finish, 700)
-  })
-
-  return voicesReady
-}
-
-function pickVoice(voices: SpeechSynthesisVoice[]) {
-  if (voices.length === 0) return null
-  const preferred = voices.find((voice) => /en(-|_)US/i.test(voice.lang) && /siri|Samantha|Karen|Daniel|Google US/i.test(voice.name))
-    ?? voices.find((voice) => /en(-|_)US/i.test(voice.lang))
+function refreshVoice() {
+  if (!canSpeakQuiz()) return null
+  const voices = window.speechSynthesis.getVoices()
+  if (voices.length === 0) return cachedVoice
+  cachedVoice = voices.find((voice) => /en(-|_)US/i.test(voice.lang) && !/compact/i.test(voice.name))
     ?? voices.find((voice) => /^en/i.test(voice.lang))
-  return preferred ?? voices[0]
+    ?? voices[0]
+  return cachedVoice
 }
 
-/** Call inside a tap handler so later programmatic speak() works on iOS. */
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  window.speechSynthesis.getVoices()
+  window.speechSynthesis.addEventListener('voiceschanged', () => {
+    refreshVoice()
+  })
+}
+
+/** Must run synchronously inside a tap handler (iOS). */
 export function unlockSpeechSynthesis() {
   if (!canSpeakQuiz()) return
   speechUnlocked = true
-  void waitForVoices().then((voices) => {
-    const voice = pickVoice(voices)
-    try {
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.resume()
-      const unlock = new SpeechSynthesisUtterance('Ready')
-      unlock.rate = 1.05
-      unlock.volume = 1
-      unlock.lang = voice?.lang || 'en-US'
-      if (voice) unlock.voice = voice
-      window.speechSynthesis.speak(unlock)
-    } catch {
-      // ignore
-    }
-  })
-
-  // Also kick an immediate empty speak in the gesture turn (iOS requirement).
+  const synth = window.speechSynthesis
   try {
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(' '))
+    synth.cancel()
+    synth.resume()
+    synth.getVoices()
+    refreshVoice()
+
+    // Keep this synchronous with the tap — do not await voices.
+    const unlock = new SpeechSynthesisUtterance('Ready')
+    unlock.rate = 1
+    unlock.volume = 1
+    unlock.lang = 'en-US'
+    const voice = cachedVoice ?? refreshVoice()
+    if (voice) {
+      unlock.voice = voice
+      unlock.lang = voice.lang
+    }
+    synth.speak(unlock)
   } catch {
     // ignore
   }
 }
 
+export function isSpeechUnlocked() {
+  return speechUnlocked
+}
+
 export function stopSpeaking() {
+  speakToken += 1
   if (!canSpeakQuiz()) return
   try {
     window.speechSynthesis.cancel()
@@ -112,72 +103,124 @@ export function stopSpeaking() {
   }
 }
 
-export async function speakText(text: string, rate = 1) {
-  if (!canSpeakQuiz() || !text.trim()) return
+function speakChunk(text: string, rate: number, token: number) {
+  return new Promise<void>((resolve) => {
+    if (!canSpeakQuiz() || token !== speakToken) {
+      resolve()
+      return
+    }
 
-  const voices = await waitForVoices()
-  const voice = pickVoice(voices)
+    const synth = window.speechSynthesis
+    try {
+      synth.resume()
+    } catch {
+      // ignore
+    }
 
-  await new Promise<void>((resolve) => {
-    stopSpeaking()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = rate
+    utterance.pitch = 1
+    utterance.volume = 1
+    utterance.lang = 'en-US'
+    const voice = cachedVoice ?? refreshVoice()
+    if (voice) {
+      utterance.voice = voice
+      utterance.lang = voice.lang
+    }
 
-    // Chrome can leave synthesis paused; iOS needs a beat after cancel.
-    window.setTimeout(() => {
-      try {
-        window.speechSynthesis.resume()
-      } catch {
-        // ignore
+    let settled = false
+    const settle = () => {
+      if (settled) return
+      settled = true
+      window.clearInterval(watchdog)
+      window.clearTimeout(timeout)
+      resolve()
+    }
+
+    utterance.onend = settle
+    utterance.onerror = settle
+
+    const watchdog = window.setInterval(() => {
+      if (token !== speakToken) {
+        settle()
+        return
       }
-
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = rate
-      utterance.pitch = 1
-      utterance.volume = 1
-      utterance.lang = voice?.lang || 'en-US'
-      if (voice) utterance.voice = voice
-
-      let settled = false
-      const settle = () => {
-        if (settled) return
-        settled = true
-        window.clearInterval(watchdog)
-        resolve()
-      }
-
-      utterance.onend = settle
-      utterance.onerror = settle
-
-      // Chrome bug: speech can freeze unless resumed periodically.
-      const watchdog = window.setInterval(() => {
-        try {
-          if (window.speechSynthesis.paused) window.speechSynthesis.resume()
-          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) settle()
-        } catch {
-          settle()
-        }
-      }, 250)
-
       try {
-        window.speechSynthesis.speak(utterance)
-        if (!speechUnlocked) {
-          // Still try; unlock should have happened on Passive tap.
-          speechUnlocked = true
-        }
+        if (synth.paused) synth.resume()
       } catch {
         settle()
       }
+    }, 200)
 
-      // Safety timeout for silent failures.
-      window.setTimeout(settle, Math.min(20000, Math.max(4000, text.length * 80)))
-    }, 60)
+    // If the browser silently drops the utterance, don't hang forever.
+    const timeout = window.setTimeout(settle, Math.min(12000, Math.max(2500, text.length * 70)))
+
+    try {
+      synth.speak(utterance)
+    } catch {
+      settle()
+    }
   })
 }
 
+function chunkSpeech(text: string, maxLen = 140) {
+  const parts = text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  const chunks: string[] = []
+  for (const part of parts) {
+    if (part.length <= maxLen) {
+      chunks.push(part)
+      continue
+    }
+    let rest = part
+    while (rest.length > maxLen) {
+      const slice = rest.slice(0, maxLen)
+      const breakAt = Math.max(slice.lastIndexOf(' '), Math.floor(maxLen * 0.6))
+      chunks.push(rest.slice(0, breakAt).trim())
+      rest = rest.slice(breakAt).trim()
+    }
+    if (rest) chunks.push(rest)
+  }
+  return chunks.length > 0 ? chunks : [text]
+}
+
+export async function speakText(text: string, rate = 1) {
+  if (!canSpeakQuiz() || !text.trim()) return
+  const token = speakToken
+  refreshVoice()
+
+  // Tiny gap after cancel so iOS/Chrome accept the next utterance.
+  await new Promise((resolve) => window.setTimeout(resolve, 80))
+  if (token !== speakToken) return
+
+  for (const chunk of chunkSpeech(text)) {
+    if (token !== speakToken) return
+    await speakChunk(chunk, rate, token)
+  }
+}
+
+export function buildQuizSpeechParts(question: string, options: string[]) {
+  return [
+    question,
+    'Your choices are:',
+    ...options.map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`),
+    'Say the letter of your answer.',
+  ]
+}
+
+export async function speakQuiz(question: string, options: string[]) {
+  const token = speakToken
+  for (const part of buildQuizSpeechParts(question, options)) {
+    if (token !== speakToken) return
+    await speakText(part)
+  }
+}
+
 export function buildQuizSpeech(question: string, options: string[]) {
-  const choices = options
-    .map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`)
-    .join('. ')
-  return `${question}. Your choices are: ${choices}. Say the letter of your answer.`
+  return buildQuizSpeechParts(question, options).join(' ')
 }
 
 function normalizeSpeech(value: string) {
