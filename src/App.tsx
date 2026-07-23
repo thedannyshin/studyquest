@@ -454,7 +454,7 @@ type FeedItem =
   | { type: 'complete' }
 const PROFILE_PHOTO = 'https://randomuser.me/api/portraits/women/68.jpg'
 const PROFILE_NAME = 'Alex Morgan'
-const PROFILE_EMAIL = 'alex@northbridge.edu'
+const PROFILE_EMAIL = 'alex@cca.edu'
 const PROFILE_SCHOOL = 'California College of the Arts'
 
 function formatPosterName(name: string) {
@@ -1217,7 +1217,7 @@ function App() {
             )}
             <label>
               Email
-              <input required type="email" placeholder="alex@northbridge.edu" />
+              <input required type="email" placeholder="alex@cca.edu" />
             </label>
             <label>
               Password
