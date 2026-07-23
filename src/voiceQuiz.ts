@@ -34,6 +34,12 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null
 }
 
+export function isIOSDevice() {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 export function canSpeakQuiz() {
   return typeof window !== 'undefined' && (
     typeof Audio !== 'undefined' || 'speechSynthesis' in window
@@ -44,13 +50,12 @@ export function canListenForQuiz() {
   return Boolean(getSpeechRecognitionCtor())
 }
 
-// Tiny valid WAV — unlocks the mobile audio session on tap.
-const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
-
 let speakToken = 0
 let voiceSession = 0
 let currentAudio: HTMLAudioElement | null = null
+let sharedAudio: HTMLAudioElement | null = null
 let audioContext: AudioContext | null = null
+let unlocked = false
 
 export function getVoiceSession() {
   return voiceSession
@@ -64,14 +69,36 @@ function pauseFeedVideos() {
   })
 }
 
-/** Google Translate TTS returns real audio/mpeg (no API key). */
+function getSharedAudio() {
+  if (!sharedAudio) {
+    sharedAudio = new Audio()
+    sharedAudio.preload = 'auto'
+    sharedAudio.muted = false
+    sharedAudio.defaultMuted = false
+    sharedAudio.volume = 1
+    sharedAudio.setAttribute('playsinline', 'true')
+    sharedAudio.setAttribute('webkit-playsinline', 'true')
+  }
+  return sharedAudio
+}
+
+/** Same-origin MP3 proxy — required on iOS Safari (blocks translate.google.com media). */
 function ttsUrl(text: string) {
-  const url = new URL('https://translate.google.com/translate_tts')
-  url.searchParams.set('ie', 'UTF-8')
-  url.searchParams.set('client', 'tw-ob')
-  url.searchParams.set('tl', 'en')
-  url.searchParams.set('q', text.slice(0, 180))
+  const url = new URL('/api/tts', window.location.origin)
+  url.searchParams.set('text', text.slice(0, 180))
   return url.toString()
+}
+
+function pickEnglishVoice(): SpeechSynthesisVoice | null {
+  if (!('speechSynthesis' in window)) return null
+  const voices = window.speechSynthesis.getVoices()
+  if (!voices.length) return null
+  return (
+    voices.find((voice) => voice.lang === 'en-US' && /samantha|karen|moira|daniel|enhanced/i.test(voice.name))
+    || voices.find((voice) => voice.lang.startsWith('en') && voice.localService)
+    || voices.find((voice) => voice.lang.startsWith('en'))
+    || null
+  )
 }
 
 function waitForAudioEnd(audio: HTMLAudioElement, token: number) {
@@ -99,21 +126,34 @@ function waitForAudioEnd(audio: HTMLAudioElement, token: number) {
 
 function speakWithSynthesis(text: string, token: number) {
   return new Promise<void>((resolve) => {
-    if (!('speechSynthesis' in window) || token !== speakToken) {
+    if (!('speechSynthesis' in window) || !text.trim() || token !== speakToken) {
       resolve()
       return
     }
 
-    window.speechSynthesis.cancel()
+    // iOS sometimes leaves synthesis in a paused state.
+    try {
+      window.speechSynthesis.resume()
+    } catch {
+      // ignore
+    }
+
     const utter = new SpeechSynthesisUtterance(text)
     utter.lang = 'en-US'
     utter.rate = 1
+    utter.pitch = 1
     utter.volume = 1
+    const voice = pickEnglishVoice()
+    if (voice) utter.voice = voice
 
     const poll = window.setInterval(() => {
       if (token !== speakToken) {
         window.clearInterval(poll)
-        window.speechSynthesis.cancel()
+        try {
+          window.speechSynthesis.cancel()
+        } catch {
+          // ignore
+        }
         resolve()
       }
     }, 80)
@@ -126,12 +166,54 @@ function speakWithSynthesis(text: string, token: number) {
     utter.onend = settle
     utter.onerror = settle
     window.speechSynthesis.speak(utter)
+
+    // iOS Safari: kick resume shortly after speak.
+    window.setTimeout(() => {
+      try {
+        window.speechSynthesis.resume()
+      } catch {
+        // ignore
+      }
+    }, 40)
   })
 }
 
-/** Unlocks iOS/Android audio session. Call from a tap handler. */
+async function speakPartsWithSynthesis(parts: string[], token: number) {
+  for (const part of parts) {
+    if (token !== speakToken) return
+    await speakWithSynthesis(part, token)
+  }
+}
+
+function playUnlockBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    audioContext = audioContext ?? new Ctx()
+    void audioContext.resume()
+    const osc = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = 880
+    gain.gain.value = 0.0001
+    gain.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.16)
+    osc.connect(gain)
+    gain.connect(audioContext.destination)
+    osc.start()
+    osc.stop(audioContext.currentTime + 0.18)
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Call from a user tap (Passive toggle / Hear question).
+ * On iOS this must run inside the gesture; it does not announce "Ready".
+ */
 export function unlockAudioSession() {
   pauseFeedVideos()
+  unlocked = true
 
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext
@@ -143,11 +225,35 @@ export function unlockAudioSession() {
     // ignore
   }
 
+  playUnlockBeep()
+
+  if ('speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.getVoices()
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        window.speechSynthesis.getVoices()
+      }, { once: true })
+      window.speechSynthesis.resume()
+    } catch {
+      // ignore
+    }
+  }
+
+  // Prime a same-origin audio element (empty play after src set happens in Ready unlock).
+  getSharedAudio()
+}
+
+/** Passive toggle: unlock + audible Ready (MP3 + on-device TTS). */
+export function unlockSpeechSynthesis() {
+  unlockAudioSession()
+
+  const audio = getSharedAudio()
   try {
-    const silent = new Audio(SILENT_WAV)
-    silent.muted = false
-    silent.volume = 1
-    void silent.play().catch(() => {})
+    audio.pause()
+    audio.muted = false
+    audio.volume = 1
+    audio.src = '/audio/ready.mp3'
+    void audio.play().catch(() => {})
   } catch {
     // ignore
   }
@@ -155,20 +261,19 @@ export function unlockAudioSession() {
   if ('speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel()
-      const warm = new SpeechSynthesisUtterance(' ')
-      warm.volume = 0
-      window.speechSynthesis.speak(warm)
-      window.speechSynthesis.cancel()
+      window.speechSynthesis.resume()
+      const utter = new SpeechSynthesisUtterance('Ready')
+      utter.lang = 'en-US'
+      utter.rate = 1
+      utter.volume = 1
+      const voice = pickEnglishVoice()
+      if (voice) utter.voice = voice
+      // Must speak in this tap turn — do not cancel afterward.
+      window.speechSynthesis.speak(utter)
     } catch {
       // ignore
     }
   }
-}
-
-/** Call from Passive toggle — unlocks session and plays an audible Ready clip. */
-export function unlockSpeechSynthesis() {
-  unlockAudioSession()
-  void playAudioClip('Ready')
 }
 
 export function stopSpeaking() {
@@ -184,9 +289,39 @@ export function stopSpeaking() {
     }
     currentAudio = null
   }
+  if (sharedAudio) {
+    try {
+      sharedAudio.pause()
+    } catch {
+      // ignore
+    }
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel()
   }
+}
+
+async function playMp3Clip(text: string, token: number) {
+  const audio = getSharedAudio()
+  currentAudio = audio
+  audio.muted = false
+  audio.defaultMuted = false
+  audio.volume = 1
+  audio.src = ttsUrl(text)
+
+  try {
+    await audio.play()
+  } catch {
+    return false
+  }
+
+  if (token !== speakToken) {
+    audio.pause()
+    return false
+  }
+
+  await waitForAudioEnd(audio, token)
+  return !audio.error && Number.isFinite(audio.duration) && audio.duration > 0.05
 }
 
 async function playAudioClip(text: string) {
@@ -194,34 +329,14 @@ async function playAudioClip(text: string) {
   const token = speakToken
   pauseFeedVideos()
 
-  const audio = new Audio()
-  currentAudio = audio
-  audio.preload = 'auto'
-  audio.muted = false
-  audio.defaultMuted = false
-  audio.volume = 1
-  audio.setAttribute('playsinline', 'true')
-  // Do not set crossOrigin — remote TTS hosts often omit CORS; HTMLAudio still plays.
-  audio.src = ttsUrl(text)
-
-  try {
-    await audio.play()
-  } catch {
-    if (token !== speakToken) return
-    currentAudio = null
+  // iOS Safari: prefer on-device speech. Remote/cross-origin MP3 is often silent.
+  if (isIOSDevice() && 'speechSynthesis' in window) {
     await speakWithSynthesis(text, token)
     return
   }
 
-  if (token !== speakToken) {
-    audio.pause()
-    return
-  }
-
-  await waitForAudioEnd(audio, token)
-
-  if (token === speakToken && audio.error) {
-    currentAudio = null
+  const played = await playMp3Clip(text, token)
+  if (!played && token === speakToken) {
     await speakWithSynthesis(text, token)
   }
 }
@@ -273,14 +388,52 @@ export async function speakQuiz(question: string, options: string[]) {
   const parts = buildQuizSpeechParts(question, options)
   const token = speakToken
   pauseFeedVideos()
+
+  if (isIOSDevice() && 'speechSynthesis' in window) {
+    await speakPartsWithSynthesis(parts, token)
+    return
+  }
+
   for (const part of parts) {
     if (token !== speakToken) return
     await playAudioClip(part)
   }
 }
 
+/**
+ * Start quiz speech inside a tap handler (Hear question).
+ * On iOS, queues speechSynthesis immediately in the gesture — no network wait.
+ * Resolves with the voice session id so callers can ignore stale completions.
+ */
+export async function speakQuizFromGesture(question: string, options: string[]) {
+  stopSpeaking()
+  unlockAudioSession()
+  const token = speakToken
+  const session = voiceSession
+  const parts = buildQuizSpeechParts(question, options)
+  pauseFeedVideos()
+
+  if ('speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.resume()
+    } catch {
+      // ignore
+    }
+    // First speak() happens synchronously before the first await inside.
+    await speakPartsWithSynthesis(parts, token)
+    return session
+  }
+
+  await speakQuiz(question, options)
+  return session
+}
+
 export function buildQuizSpeech(question: string, options: string[]) {
   return buildQuizSpeechParts(question, options).join(' ')
+}
+
+export function isAudioSessionUnlocked() {
+  return unlocked
 }
 
 function normalizeSpeech(value: string) {
@@ -395,11 +548,9 @@ export function startListeningForOption(
 
   const generation = ++listenGeneration
   let stopped = false
-  const isIOS = typeof navigator !== 'undefined'
-    && (/iPad|iPhone|iPod/.test(navigator.userAgent)
-      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+  const ios = isIOSDevice()
 
-  recognition.continuous = !isIOS
+  recognition.continuous = !ios
   recognition.interimResults = true
 
   const handleResult = (event: SpeechRecognitionEventLike) => {
@@ -431,7 +582,7 @@ export function startListeningForOption(
       onStatus?.('ended')
       return
     }
-    if (isIOS) {
+    if (ios) {
       window.setTimeout(() => {
         if (stopped || generation !== listenGeneration) return
         try {

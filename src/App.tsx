@@ -11,10 +11,10 @@ import {
   canSpeakQuiz,
   getVoiceSession,
   speakQuiz,
+  speakQuizFromGesture,
   speakText,
   startListeningForOption,
   stopSpeaking,
-  unlockAudioSession,
   unlockSpeechSynthesis,
   warmUpSpeechRecognition,
 } from './voiceQuiz'
@@ -2379,12 +2379,9 @@ function PostCard({
 
   const replayQuizSpeech = () => {
     if (!quiz?.options?.length || displaySubmitted) return
-    stopSpeaking()
-    unlockAudioSession()
-    const session = getVoiceSession()
     setVoiceStatus('speaking')
-    // First MP3 play() happens inside this tap turn (required on iOS).
-    void speakQuiz(quiz.question, quiz.options).then(() => {
+    // Speak inside this tap — required for iOS Safari.
+    void speakQuizFromGesture(quiz.question, quiz.options).then((session) => {
       if (!activeRef.current || displaySubmitted || session !== getVoiceSession()) return
       if (!canListenForQuiz()) {
         setVoiceStatus('unsupported')
